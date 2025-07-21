@@ -1,6 +1,7 @@
-import { Badge, CardData, Clear, ClearData, Crown, Difficulty } from "../types/types";
-import { checkNamcoLogin, Const, createHeader, HirobaError, sanitizeHTML, parseHTML, isBrowser } from "../util";
+import { Badge, CardData, Clear, ClearData, CompeDetail, CompeSongData, Crown, Difficulty } from "../types/types";
+import { checkNamcoLogin, Const, createHeader, HirobaError, sanitizeHTML, parseHTML, isBrowser, checkCardLogin } from "../util";
 import setCookieParser from 'set-cookie-parser';
+import { CompeDate } from "./compeDate";
 
 export class DonderHiroba {
 
@@ -59,7 +60,7 @@ export namespace DonderHiroba {
                     }
                 }
 
-                const { logined, error } = checkNamcoLogin(response);
+                const { logined, error } = checkCardLogin(response);
                 if (!logined) throw error;
 
                 return await response.text();
@@ -83,7 +84,7 @@ export namespace DonderHiroba {
                         }
                     }
 
-                    const { logined, error } = checkNamcoLogin(response);
+                    const { logined, error } = checkCardLogin(response);
                     if (!logined) throw error;
 
                     datas.push(await response.text());
@@ -92,6 +93,30 @@ export namespace DonderHiroba {
                 return datas;
             }
         };
+
+        export async function compeDetail(data: { token?: string, compeId: string }) {
+            const { token, compeId } = data;
+            try {
+                var response = await fetch(`https://donderhiroba.jp/compe_detail.php?compeid=${compeId}`, {
+                    headers: createHeader(token ? `_token_v2=${token}` : undefined),
+                    redirect: 'manual'
+                });
+            }
+            catch (err) {
+                if (err instanceof Response) {
+                    throw new HirobaError('CANNOT_CONNECT', err);
+                }
+                else {
+                    throw new HirobaError('CANNOT_CONNECT');
+                }
+            }
+
+            const { logined, error } = checkNamcoLogin(response);
+            if (!logined) throw error;
+
+            const html = await response.text();
+            return html;
+        }
     }
 
     export namespace parse {
@@ -230,10 +255,123 @@ export namespace DonderHiroba {
                         };
                         clearDataMap.set(songNo, clearData);
                     }
-                    clearData.difficulty = {...clearData.difficulty, ...difficultyRecord};
+                    clearData.difficulty = { ...clearData.difficulty, ...difficultyRecord };
                 });
 
                 return clearDataMap;
+            }
+        }
+
+        export function ticket(html: string) {
+            const dom = parseHTML(html);
+            return (dom.getElementById('#_tckt') as HTMLInputElement | null)?.value ?? null;
+        }
+
+        export function compeDetail(html: string) {
+            const dom = parseHTML(html);
+
+            const header = dom.querySelector('header > h1')?.textContent?.trim();
+            if (!header || header === 'エラー') {
+                return null;
+            }
+
+            const title = dom.querySelector('#compeDetail > ul.festivalThumbList > li > section > aside > div > ul > li:nth-child(1)')?.textContent?.replace('大会名：', '')?.trim();
+            const hostNickname = dom.querySelector("#compeDetail > ul.festivalThumbList > li > section > aside > div > ul > li:nth-child(2)")?.textContent?.replace('主催：', '')?.trim();
+            const hostTaikoNo = dom.querySelector('#compeDetail > ul.festivalThumbList > li > section > a')?.getAttribute('href')?.split('=')?.[1];
+            const totalEntryText = dom.querySelector('#compeDetail > ul.festivalThumbList > li > section > aside > div > ul > li:nth-child(3)')?.textContent?.replace('人数：', '')?.split('人')?.[0];
+            const startDateText = dom.querySelector('#compeDetail > ul.festivalThumbList > li > section > aside > div > ul > li:nth-child(4)')?.textContent?.replace('期間：', '')?.replace('～', '')?.trim();
+            const endDateText = dom.querySelector('#compeDetail > ul.festivalThumbList > li > section > aside > div > ul > li:nth-child(5)')?.textContent?.trim();
+
+            if (!title || !hostNickname || !hostTaikoNo || !totalEntryText || !startDateText || !endDateText) return null;
+
+            const songList: CompeSongData[] = [];
+            const difficulties = ['easy', 'normal', 'hard', 'oni', 'ura'] as const;
+            dom.querySelectorAll('li.contentBox.mypageSongListArea').forEach((li) => {
+                const imgs = li.querySelectorAll('img');
+                const songName = li.querySelector('.songName')?.textContent?.trim();
+                const difficulty = difficulties[Number(imgs[0].getAttribute('src')?.replace(/image\/sp\/640\/level_button_(.*)_([0-9])_640.png/, '$2')) - 1];
+
+                if (!songName || !difficulty) return;
+                const compeSongData: CompeSongData = {
+                    songName,
+                    difficulty
+                }
+
+                let src: string | null | undefined;
+                // 배속
+                src = imgs[1].getAttribute('src');
+                if (src && !src.includes('blank')) {
+                    compeSongData.speed = getSpeedData(src.split('image/sp/640/status')[1].split('_')[2]);
+                }
+                // 도롱
+                src = imgs[2].getAttribute('src');
+                if (src && !src.includes("blank")) {
+                    if (src.includes("option_button_doron_normal_")) {
+                        compeSongData.doron = false;
+                    }
+                    else {
+                        compeSongData.doron = true;
+                    }
+                }
+                //아베코베
+                src = imgs[3].getAttribute('src');
+                if (src && !src.includes("blank")) {
+                    if (src.includes("option_button_abekobe_normal_")) {
+                        compeSongData.abekobe = false;
+                    }
+                    else {
+                        compeSongData.abekobe = true;
+                    }
+                }
+                //랜덤
+                src = imgs[4].getAttribute('src');
+                if (src && !src.includes("blank")) {
+                    if (src.includes("image/sp/640/option_button_kimagure")) {
+                        compeSongData.random = "kimagure";
+                    }
+                    else if (src.includes("image/sp/640/option_button_detarame")) {
+                        compeSongData.random = "detarame";
+                    }
+                    else {
+                        compeSongData.random = false;
+                    }
+                };
+
+                songList.push(compeSongData);
+            });
+
+            const compeDetail: CompeDetail = {
+                title,
+                hostNickname,
+                hostTaikoNo,
+                totalEntry: Number(totalEntryText),
+                startDate: new CompeDate(startDateText),
+                endDate: new CompeDate(endDateText),
+                songList
+            };
+            if (compeDetail.startDate.getTime() > compeDetail.endDate.getTime()) {
+                compeDetail.endDate.setFullYear(compeDetail.endDate.getFullYear() + 1)
+            };
+            return compeDetail;
+
+            function getSpeedData(key: string): number {
+                switch (key) {
+                    case 'a3': return 2.0;
+                    case 'a4': return 3.0;
+                    case 'a5': return 4.0;
+                    case 'a11': return 1.1;
+                    case 'a12': return 1.2;
+                    case 'a13': return 1.3;
+                    case 'a14': return 1.4;
+                    case 'a15': return 1.5;
+                    case 'a16': return 1.6;
+                    case 'a17': return 1.7;
+                    case 'a18': return 1.8;
+                    case 'a19': return 1.9;
+                    case 'a25': return 2.5;
+                    case 'a35': return 3.5;
+                }
+                return 1.0
             }
         }
     }
@@ -245,7 +383,7 @@ export namespace DonderHiroba {
          * @param password 
          * @returns 
          */
-        export async function getSessionToken({email, password}: {email: string, password: string}) {
+        export async function getSessionToken({ email, password }: { email: string, password: string }) {
             /*
             첫 번째 요청
             200 응답
@@ -447,8 +585,17 @@ export namespace DonderHiroba {
         /**
          * 클리어 데이터를 가져옵니다.
          */
-        export async function getClearData(data?: {token?: string, genre?: keyof typeof Const.genre}){
+        export async function getClearData(data?: { token?: string, genre?: keyof typeof Const.genre }) {
             return parse.clearData(await request.clearData(data));
+        }
+
+        /**
+         * 특정 대회의 상세 데이터를 가져옵니다.
+         * @param data
+         * @returns 
+         */
+        export async function getCompeDetail(data: {token?: string, compeId: string}){
+            return parse.compeDetail(await request.compeDetail(data))
         }
     }
 }
