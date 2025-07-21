@@ -1,4 +1,4 @@
-import { Badge, CardData, Clear, ClearData, CompeDetail, CompeSongData, Crown, Difficulty } from "../types/types";
+import { Badge, CardData, Clear, ClearData, CompeDetail, CompeSongData, Crown, Difficulty, RankingData } from "../types/types";
 import { checkNamcoLogin, Const, createHeader, HirobaError, sanitizeHTML, parseHTML, isBrowser, checkCardLogin } from "../util";
 import setCookieParser from 'set-cookie-parser';
 import { CompeDate } from "./compeDate";
@@ -98,6 +98,30 @@ export namespace DonderHiroba {
             const { token, compeId } = data;
             try {
                 var response = await fetch(`https://donderhiroba.jp/compe_detail.php?compeid=${compeId}`, {
+                    headers: createHeader(token ? `_token_v2=${token}` : undefined),
+                    redirect: 'manual'
+                });
+            }
+            catch (err) {
+                if (err instanceof Response) {
+                    throw new HirobaError('CANNOT_CONNECT', err);
+                }
+                else {
+                    throw new HirobaError('CANNOT_CONNECT');
+                }
+            }
+
+            const { logined, error } = checkNamcoLogin(response);
+            if (!logined) throw error;
+
+            const html = await response.text();
+            return html;
+        }
+
+        export async function compeRanking(data: { token?: string, compeId: string }) {
+            const { token, compeId } = data;
+            try {
+                var response = await fetch(`https://donderhiroba.jp/compe_ranking.php?compeid=${compeId}`, {
                     headers: createHeader(token ? `_token_v2=${token}` : undefined),
                     redirect: 'manual'
                 });
@@ -374,6 +398,58 @@ export namespace DonderHiroba {
                 return 1.0
             }
         }
+
+        export function compeRanking(html: string) {
+            const dom = parseHTML(html);
+
+            const header = dom.querySelector('header > h1')?.textContent?.trim();
+            if (!header || header === 'エラー') {
+                return null;
+            }
+
+            const rankingDatas: RankingData[] = [];
+            dom.querySelectorAll('.festivalRankThumbList').forEach((el) => {
+                const rankText = el.querySelector('.compeRankingText')?.textContent?.trim()?.replace('位', '');
+                const entryNickName = el.querySelector('.player-info div')?.textContent?.trim()?.split('\n')?.[0];
+                const entryTaikoNo = el.querySelector('.player-info img')?.getAttribute('src')?.replace(/^(.*)mydon_([0-9]*)$/, '$2');
+
+                if (!rankText || !entryNickName || !entryTaikoNo) return;
+
+                const rankingData: RankingData = {
+                    rank: Number(rankText),
+                    entryNickName,
+                    entryTaikoNo,
+                    songScore: [],
+                    totalScore: 0
+                };
+
+                const totalScoreText = el.querySelector('.player-info div')?.textContent?.trim()?.split('\n')?.[1]?.trim()?.replace('点', '');
+                if (totalScoreText && totalScoreText !== "スコア未登録") {
+                    rankingData.totalScore = Number(totalScoreText);
+                };
+
+                el.querySelectorAll('.block > div').forEach((ele) => {
+                    const title = ele.querySelector('p:nth-last-child(3)')?.textContent?.trim();
+                    const songScoreText = ele.querySelector('p:nth-last-child(2)')?.textContent?.trim()?.replace('点', '');
+
+                    if (!title || !songScoreText) return;
+
+                    let score = 0;
+                    if (songScoreText !== "スコア未登録") {
+                        score = Number(songScoreText)
+                    }
+
+                    rankingData.songScore.push({
+                        title,
+                        score
+                    });
+                });
+
+                rankingDatas.push(rankingData);
+            });
+
+            return rankingDatas;
+        }
     }
 
     export namespace func {
@@ -594,8 +670,39 @@ export namespace DonderHiroba {
          * @param data
          * @returns 
          */
-        export async function getCompeDetail(data: {token?: string, compeId: string}){
+        export async function getCompeDetail(data: { token?: string, compeId: string }) {
             return parse.compeDetail(await request.compeDetail(data))
+        }
+
+        /**
+         * 특정 대회의 랭킹 데이터를 가져옵니다.
+         * @param data
+         * @returns 
+         */
+        export async function getCompeRanking(data: { token?: string, compeId: string }) {
+            return parse.compeRanking(await request.compeRanking(data))
+        }
+
+        /**
+         * 특정 대회의 데이터를 가져옵니다.
+         */
+        export async function getCompeData(data: { token?: string, compeId: string }) {
+            const {token, compeId} = data;
+            const detail = await getCompeDetail({token, compeId});
+            if (detail === null) {
+                return null;
+            }
+            const ranking = await getCompeRanking({token, compeId});
+            if (ranking === null) {
+                return null;
+            }
+
+            const compeData = {
+                ...detail,
+                ranking
+            }
+
+            return compeData;
         }
     }
 }
