@@ -97,10 +97,10 @@ export function isBrowser(){
 
 export function parseHTML(html: string) {
     if (isBrowser()) { //browser
-        return new DOMParser().parseFromString(html, 'text/html') as unknown as HTMLElement;
+        return new DOMParser().parseFromString(html, 'text/html');
     }
     else { //nodejs
-        return nodeHtmlParser(html) as HTMLElement;
+        return nodeHtmlParser(html);
     }
 }
 export function sanitizeHTML(html: string) {

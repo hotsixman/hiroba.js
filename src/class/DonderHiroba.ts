@@ -1,4 +1,4 @@
-import { CardData } from "../types/types";
+import { Badge, CardData, Clear, ClearData, Crown, Difficulty } from "../types/types";
 import { checkNamcoLogin, Const, createHeader, HirobaError, sanitizeHTML, parseHTML, isBrowser } from "../util";
 import setCookieParser from 'set-cookie-parser';
 
@@ -114,6 +114,128 @@ export namespace DonderHiroba {
 
             return cardList;
         }
+
+        export function clearData(html: string | string[]) {
+            if (Array.isArray(html)) {
+                const clearDataMap = new Map<string, ClearData>();
+                html.forEach((html) => p(html, clearDataMap));
+                return [...clearDataMap.values()];
+            }
+            else {
+                return [...p(html).values()];
+            }
+
+            function p(html: string, clearDataMap?: Map<string, ClearData>) {
+                const dom = parseHTML(html);
+                clearDataMap = clearDataMap ?? new Map<string, ClearData>();
+
+                dom.querySelectorAll('.contentBox').forEach((box) => {
+                    // 제목과 곡 번호
+                    const title = box.querySelector('.songNameArea span')?.textContent?.trim();
+                    const songNo = new URL(`https://donderhiroba.jp/${box.querySelector('a')?.getAttribute('href') ?? ''}`).searchParams.get('song_no');
+                    if (!title || !songNo) return;
+
+                    // 왕관과 뱃지
+                    const difficultyRecord: Partial<Record<Difficulty, Clear>> = {};
+                    box.querySelectorAll('.buttonList img').forEach((img) => {
+                        const [crownHint, badgeHint] = img.getAttribute('src')?.replace('image/sp/640/crown_button_', '')?.replace('_640.png', '')?.split('_') ?? [];
+                        // 이미지를 찾을 수 없거나 플레이 하지 않은 경우
+                        if (!crownHint || crownHint === 'none') return;
+
+                        // 난이도
+                        const difficultyHint = img.getAttribute('class')?.split(' ')[1];
+                        let difficulty: Difficulty;
+                        if (difficultyHint?.includes('easy')) {
+                            difficulty = 'easy';
+                        }
+                        else if (difficultyHint?.includes('normal')) {
+                            difficulty = 'normal';
+                        }
+                        else if (difficultyHint?.includes('hard')) {
+                            difficulty = 'hard';
+                        }
+                        else if (difficultyHint?.includes('oni_ura')) {
+                            difficulty = 'ura';
+                        }
+                        else {
+                            difficulty = 'oni';
+                        }
+
+                        // 왕관
+                        let crown: Crown = null;
+                        switch (crownHint) {//왕관
+                            case 'played': {
+                                crown = 'played';
+                                break;
+                            }
+                            case 'silver': {
+                                crown = 'silver';
+                                break;
+                            }
+                            case 'gold': {
+                                crown = 'gold';
+                                break;
+                            }
+                            case 'donderfull': {
+                                crown = 'donderfull';
+                                break;
+                            }
+                        }
+
+                        // 점수 딱지
+                        let badge: Badge = null;
+                        switch (badgeHint) {//배지
+                            case '8': {
+                                badge = 'rainbow';
+                                break;
+                            }
+                            case '7': {
+                                badge = 'purple';
+                                break;
+                            }
+                            case '6': {
+                                badge = 'pink';
+                                break;
+                            }
+                            case '5': {
+                                badge = 'gold';
+                                break;
+                            }
+                            case '4': {
+                                badge = 'silver';
+                                break;
+                            }
+                            case '3': {
+                                badge = 'bronze';
+                                break;
+                            }
+                            case '2': {
+                                badge = 'white';
+                                break;
+                            }
+                        };
+
+                        difficultyRecord[difficulty] = {
+                            crown,
+                            badge
+                        }
+                    });
+
+                    let clearData = clearDataMap.get(songNo);
+                    if (!clearData) {
+                        clearData = {
+                            title,
+                            songNo,
+                            difficulty: {}
+                        };
+                        clearDataMap.set(songNo, clearData);
+                    }
+                    clearData.difficulty = {...clearData.difficulty, ...difficultyRecord};
+                });
+
+                return clearDataMap;
+            }
+        }
     }
 
     export namespace func {
@@ -123,7 +245,7 @@ export namespace DonderHiroba {
          * @param password 
          * @returns 
          */
-        export async function getSessionToken(email: string, password: string) {
+        export async function getSessionToken({email, password}: {email: string, password: string}) {
             /*
             첫 번째 요청
             200 응답
@@ -262,7 +384,7 @@ export namespace DonderHiroba {
          * 특정 북번호를 가진 카드로 로그인합니다.
          * @param data 
          */
-        export async function cardLogin(data: { token?: string, taikoNumber: string, cardList?: CardData[]}) {
+        export async function cardLogin(data: { token?: string, taikoNumber: string, cardList?: CardData[] }) {
             const { token, taikoNumber } = data;
 
             const cardList = data.cardList ?? await getCardList(data);
@@ -302,15 +424,15 @@ export namespace DonderHiroba {
 
             // 두 번째 요청
             // 200 응답
-            try{
+            try {
                 response = await fetch(response.headers.get('location') as string, {
                     method: 'get',
                     headers: createHeader(token ? `_token_v2=${token}` : undefined)
                 });
 
-                if(response.status !== 200) throw response;
+                if (response.status !== 200) throw response;
             }
-            catch(err){
+            catch (err) {
                 if (err instanceof Response) {
                     throw new HirobaError('CANNOT_CONNECT', err);
                 }
@@ -320,6 +442,13 @@ export namespace DonderHiroba {
             };
 
             return cardList[matchedCardIndex];
+        }
+
+        /**
+         * 클리어 데이터를 가져옵니다.
+         */
+        export async function getClearData(data?: {token?: string, genre?: keyof typeof Const.genre}){
+            return parse.clearData(await request.clearData(data));
         }
     }
 }
