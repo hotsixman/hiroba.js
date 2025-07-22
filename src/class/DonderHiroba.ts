@@ -1,7 +1,8 @@
-import { Badge, CardData, Clear, ClearData, CompeDetail, CompeSongData, Crown, DaniData, Difficulty, RankingData, BestScore, Condition, SongRecord } from "../types/types";
+import { Badge, CardData, Clear, ClearData, CompeDetail, CompeSongData, Crown, DaniData, Difficulty, RankingData, BestScore, Condition, SongRecord, ScoreData, DifficultyScoreData } from "../types/types";
 import { checkNamcoLogin, Const, createHeader, HirobaError, sanitizeHTML, parseHTML, isBrowser, checkCardLogin } from "../util";
 import setCookieParser from 'set-cookie-parser';
 import { CompeDate } from "./compeDate";
+import { HTMLElement } from "node-html-parser";
 
 export class DonderHiroba {
 
@@ -225,6 +226,55 @@ export namespace DonderHiroba {
                 }
 
                 return htmls;
+            }
+        }
+
+        export async function scoreData(data: { token?: string, songNo: string, difficulty?: undefined }): Promise<string[]>;
+        export async function scoreData(data: { token?: string, songNo: string, difficulty: Difficulty }): Promise<string>;
+        export async function scoreData(data: { token?: string, songNo: string, difficulty?: Difficulty }) {
+            const { token, songNo, difficulty } = data;
+            if (difficulty) {
+                return await requestScoreDataByDiff({ token, songNo, difficulty });
+            }
+            else {
+                const htmls: string[] = [];
+                for (const difficulty of ['easy', 'normal', 'hard', 'oni', 'ura'] as Difficulty[]) {
+                    htmls.push(await requestScoreDataByDiff({ token, songNo, difficulty }));
+                }
+                return htmls;
+            }
+
+            function getDifficultyNumber(difficulty: Difficulty) {
+                const m: Record<Difficulty, number> = {
+                    easy: 1,
+                    normal: 2,
+                    hard: 3,
+                    oni: 4,
+                    ura: 5
+                };
+                return m[difficulty];
+            }
+
+            async function requestScoreDataByDiff({ songNo, difficulty, token }: { songNo: string, difficulty: Difficulty, token?: string }) {
+                try {
+                    var response = await fetch(`https://donderhiroba.jp/score_detail.php?song_no=${songNo}&level=${getDifficultyNumber(difficulty)}`, {
+                        headers: createHeader(token ? `_token_v2=${token}` : undefined),
+                        redirect: 'manual'
+                    });
+                }
+                catch (err) {
+                    if (err instanceof Response) {
+                        throw new HirobaError('CANNOT_CONNECT', err);
+                    }
+                    else {
+                        throw new HirobaError('CANNOT_CONNECT');
+                    }
+                };
+
+                const { logined, error } = checkNamcoLogin(response);
+                if (!logined) throw error;
+
+                return await response.text();
             }
         }
     }
@@ -755,6 +805,155 @@ export namespace DonderHiroba {
                 }
             }
         }
+
+        export function scoreData(data: { html: string | string[], songNo: string}) {
+            const { html, songNo } = data;
+
+            if (typeof(html) === "string") {
+                const { title, difficulty, difficultyScoreData } = p(html as string) ?? {};
+                if (!title || !difficulty || !difficultyScoreData) return null;
+
+                const scoreData: ScoreData = {
+                    title,
+                    songNo,
+                    difficulty: {}
+                };
+
+                scoreData.difficulty[difficulty] = difficultyScoreData;
+
+                return scoreData;
+            }
+            else {
+                let scoreData: ScoreData | null = null;
+
+                for (let i = 0; i < 5; i++) {
+                    if (!(html as string[])[i]) continue;
+
+                    const { title, difficulty, difficultyScoreData } = p((html as string[])[i]) ?? {};
+                    if (!title || !difficulty || !difficultyScoreData) continue;
+
+                    if (!scoreData) {
+                        scoreData = {
+                            title,
+                            songNo,
+                            difficulty: {}
+                        }
+                    }
+
+                    scoreData.difficulty[difficulty] = difficultyScoreData;
+                }
+
+                return scoreData;
+            }
+
+            function p(html: string) {
+                const dom = parseHTML(html);
+
+                const errorText = dom.querySelector('#content')?.textContent?.trim();
+                if (errorText === '指定されたページは存在しません。') return null;
+
+                const title = dom.querySelector('.songNameTitleScore')?.textContent?.trim();
+                const difficultyNumber = dom.querySelector('.level')?.getAttribute('src')?.replace(/image\/sp\/640\/level_icon_([0-9])_640.png/, '$1');
+                const difficulty = (['easy', 'normal', 'hard', 'oni', 'ura'] as const)[Number(difficultyNumber) - 1];
+                if (!title || !difficulty) return null;
+
+                const difficultyScoreData: DifficultyScoreData = {
+                    crown: null,
+                    badge: null,
+                    score: 0,
+                    ranking: 0,
+                    good: 0,
+                    ok: 0,
+                    bad: 0,
+                    maxCombo: 0,
+                    roll: 0,
+                    count: {
+                        play: 0,
+                        clear: 0,
+                        fullcombo: 0,
+                        donderfullcombo: 0
+                    }
+                }
+
+                if (dom.querySelectorAll('.scoreDetailStatus').length > 0) {
+                    const crown = getCrown(dom.querySelector('.scoreDetailStatus .crown')?.getAttribute('src')?.replace('image/sp/640/crown_large_', '')?.replace('_640.png', ''));
+                    if (crown) difficultyScoreData.crown = crown;
+
+                    const badge = getBadge(dom.querySelector('.scoreDetailStatus .best_score_icon'));
+                    if (badge) difficultyScoreData.badge = badge;
+
+                    difficultyScoreData.score = Number(dom.querySelector('.high_score')?.textContent?.replace(/[^0-9]/g, '')) || 0;
+                    difficultyScoreData.ranking = Number(dom.querySelector('.ranking')?.textContent?.replace(/[^0-9]/g, '')) || 0;
+                    difficultyScoreData.good = Number(dom.querySelector('.good_cnt')?.textContent?.replace(/[^0-9]/g, '')) || 0;
+                    difficultyScoreData.ok = Number(dom.querySelector('.ok_cnt')?.textContent?.replace(/[^0-9]/g, '')) || 0;
+                    difficultyScoreData.bad = Number(dom.querySelector('.ng_cnt')?.textContent?.replace(/[^0-9]/g, '')) || 0;
+                    difficultyScoreData.maxCombo = Number(dom.querySelector('.combo_cnt')?.textContent?.replace(/[^0-9]/g, '')) || 0;
+                    difficultyScoreData.roll = Number(dom.querySelector('.pound_cnt')?.textContent?.replace(/[^0-9]/g, '')) || 0;
+                    difficultyScoreData.count.play = Number(dom.querySelector('.stage_cnt')?.textContent?.replace(/[^0-9]/g, '')) || 0;
+                    difficultyScoreData.count.clear = Number(dom.querySelector('.clear_cnt')?.textContent?.replace(/[^0-9]/g, '')) || 0;
+                    difficultyScoreData.count.fullcombo = Number(dom.querySelector('.full_combo_cnt')?.textContent?.replace(/[^0-9]/g, '')) || 0;
+                    difficultyScoreData.count.donderfullcombo = Number(dom.querySelector('.dondafull_combo_cnt')?.textContent?.replace(/[^0-9]/g, '')) || 0;
+                }
+
+                return { title, difficulty, difficultyScoreData };
+            }
+
+            function getCrown(src: string | undefined) {
+                let crown: Crown | null = null;
+                switch (src) {
+                    case '0': {
+                        crown = 'played';
+                        break;
+                    }
+                    case '1': {
+                        crown = 'silver';
+                        break;
+                    }
+                    case '2': {
+                        crown = 'gold';
+                        break;
+                    }
+                    case '3': {
+                        crown = 'donderfull';
+                        break;
+                    }
+                }
+                return crown;
+            }
+
+            function getBadge(element: HTMLElement | Element | null): Badge | null {
+                if (!element) return null;
+                const badgeText = element.getAttribute('src')?.replace('image/sp/640/best_score_rank_', '').replace('_640.png', '');
+                if (!badgeText) return null;
+
+                switch (badgeText) {
+                    case '8': {
+                        return 'rainbow';
+                    }
+                    case '7': {
+                        return 'purple';
+                    }
+                    case '6': {
+                        return 'pink';
+                    }
+                    case '5': {
+                        return 'gold';
+                    }
+                    case '4': {
+                        return 'silver';
+                    }
+                    case '3': {
+                        return 'bronze';
+                    }
+                    case '2': {
+                        return 'white';
+                    }
+                    default: {
+                        return null;
+                    }
+                }
+            }
+        }
     }
 
     export namespace func {
@@ -1019,6 +1218,10 @@ export namespace DonderHiroba {
             return parse.currentLogin(await request.currentLogin(data));
         }
 
+        /**
+         * 단위 플레이 데이터를 가져옵니다.
+         * @param data 
+         */
         export async function getDaniData(data?: { token?: string }): Promise<DaniData[]>;
         export async function getDaniData(data?: { token?: string, daniNo: number }): Promise<DaniData | null>;
         export async function getDaniData(data?: { token?: string, daniNo?: number }) {
@@ -1029,6 +1232,16 @@ export namespace DonderHiroba {
             else {
                 return parse.daniData((await request.daniData({ token })).map((html, i) => ({ html, daniNo: i + 1 })))
             }
+        }
+
+        /**
+         * 곡의 점수 데이터를 가져옵니다.
+         * @param data 
+         * @returns 
+         */
+        export async function getScoreData(data: { token?: string, songNo: string, difficulty?: Difficulty }) {
+            const { token, songNo, difficulty } = data;
+            return parse.scoreData({ html: await request.scoreData({ token, songNo, difficulty: (difficulty as any) }), songNo });
         }
     }
 }
