@@ -24,6 +24,7 @@
     "cheerio": "^1.0.0-rc.12",
     "fs": "^0.0.1-security",
     "i": "^0.3.7",
+    "jimp": "^1.6.0",
     "node-html-parser": "^7.0.1",
     "npm": "^11.4.2",
     "set-cookie-parser": "^2.7.1"

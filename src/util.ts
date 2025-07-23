@@ -1,4 +1,5 @@
 import { load } from "cheerio";
+import { type intToRGBA, type Jimp } from "jimp";
 import { parse as nodeHtmlParser, type HTMLElement } from 'node-html-parser';
 
 export function createHeader(cookie?: string) {
@@ -91,7 +92,7 @@ export function checkCardLogin(response: Response) {
     }
 }
 
-export function isBrowser(){
+export function isBrowser() {
     return typeof (window) !== "undefined";
 }
 
@@ -106,6 +107,84 @@ export function parseHTML(html: string) {
 export function sanitizeHTML(html: string) {
     let $ = load(html);
     return $.html();
+}
+
+let jimp: { Jimp: typeof Jimp, intToRGBA: typeof intToRGBA } | null = null;
+export async function detectDaniPass(image: Blob) {
+    const pixelExtractor = await getPixelExtractor(image);
+    if (!pixelExtractor) return null;
+
+    const passRgb = pixelExtractor(425, 73);
+    let pass: 'red' | 'gold' | null = null
+    if (isSameRgb(passRgb, { r: 247, g: 52, b: 13 })) {
+        pass = 'red';
+    }
+    else if (isSameRgb(passRgb, { r: 251, g: 234, b: 6 })) {
+        pass = 'gold';
+    }
+    if (!pass) return null;
+
+    const edgeRgb = pixelExtractor(435, 132);
+    let edge: 'silver' | 'gold' | 'donderfull';
+    if (isSameRgb(edgeRgb, { r: 213, g: 213, b: 214 })) {
+        edge = 'silver';
+    }
+    else if (isSameRgb(edgeRgb, { r: 243, g: 190, b: 37 })) {
+        edge = 'gold';
+    }
+    else {
+        edge = 'donderfull';
+    }
+
+    return { pass, edge }
+
+
+    async function getPixelExtractor(image: Blob) {
+        if (isBrowser()) {
+            const img = new Image();
+            const imageUrl = URL.createObjectURL(image);
+            const loadPromise = new Promise<boolean>((res) => {
+                img.onload = () => res(true);
+                img.onerror = () => res(false);
+            }).then((v) => {
+                URL.revokeObjectURL(imageUrl);
+                return v;
+            })
+            img.src = imageUrl;
+
+            if (await loadPromise === null) return null;
+
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+            if (!context) {
+                return null;
+            }
+            canvas.width = img.width;
+            canvas.height = img.height;
+            context.drawImage(img, 0, 0);
+
+            return (x: number, y: number) => {
+                const pixelData = context.getImageData(x, y, 1, 1).data;
+                return ({ r: pixelData[0], g: pixelData[1], b: pixelData[2], a: pixelData[3] });
+            }
+        }
+        else {
+            if (!jimp) {
+                jimp = await import('jimp').then((module) => ({ Jimp: module.Jimp, intToRGBA: module.intToRGBA })) as { Jimp: typeof Jimp, intToRGBA: typeof intToRGBA };
+            }
+            const img = await jimp.Jimp.read(await image.arrayBuffer());
+
+            return (x: number, y: number) => {
+                const hex = img.getPixelColor(x, y);
+                const rgba = (jimp as { Jimp: typeof Jimp, intToRGBA: typeof intToRGBA }).intToRGBA(hex);
+                return rgba;
+            }
+        }
+    }
+
+    function isSameRgb(rgb1: { r: number, g: number, b: number }, rgb2: { r: number, g: number, b: number }) {
+        return (rgb2.r - 10 <= rgb1.r && rgb1.r <= rgb2.r + 10) && (rgb2.g - 10 <= rgb1.g && rgb1.g <= rgb2.g + 10) && (rgb2.b - 10 <= rgb1.b && rgb1.b <= rgb2.b + 10);
+    }
 }
 
 export namespace Const {

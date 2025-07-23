@@ -277,6 +277,30 @@ export namespace DonderHiroba {
                 return await response.text();
             }
         }
+
+        export async function ticket(data?: { token?: string }) {
+            const { token } = data ?? {};
+
+            try {
+                var response = await fetch(`https://donderhiroba.jp/mypage_top.php`, {
+                    headers: createHeader(token ? `_token_v2=${token}` : undefined),
+                    redirect: 'manual'
+                });
+            }
+            catch (err) {
+                if (err instanceof Response) {
+                    throw new HirobaError('CANNOT_CONNECT', err);
+                }
+                else {
+                    throw new HirobaError('CANNOT_CONNECT');
+                }
+            }
+
+            const { logined, error } = checkNamcoLogin(response);
+            if (!logined) throw error;
+
+            return await response.text();
+        }
     }
 
     export namespace parse {
@@ -424,7 +448,7 @@ export namespace DonderHiroba {
 
         export function ticket(html: string) {
             const dom = parseHTML(html);
-            return (dom.getElementById('#_tckt') as HTMLInputElement | null)?.value ?? null;
+            return (dom.getElementById('_tckt') as HTMLInputElement | null)?.getAttribute('value') ?? null;
         }
 
         export function compeDetail(html: string) {
@@ -806,10 +830,10 @@ export namespace DonderHiroba {
             }
         }
 
-        export function scoreData(data: { html: string | string[], songNo: string}) {
+        export function scoreData(data: { html: string | string[], songNo: string }) {
             const { html, songNo } = data;
 
-            if (typeof(html) === "string") {
+            if (typeof (html) === "string") {
                 const { title, difficulty, difficultyScoreData } = p(html as string) ?? {};
                 if (!title || !difficulty || !difficultyScoreData) return null;
 
@@ -1222,7 +1246,7 @@ export namespace DonderHiroba {
          * 단위 플레이 데이터를 가져옵니다.
          * @param data 
          */
-        export async function getDaniData(data?: { token?: string }): Promise<DaniData[]>;
+        export async function getDaniData(data?: { token?: string, daniNo?: undefined }): Promise<DaniData[]>;
         export async function getDaniData(data?: { token?: string, daniNo: number }): Promise<DaniData | null>;
         export async function getDaniData(data?: { token?: string, daniNo?: number }) {
             const { token, daniNo } = data ?? {};
@@ -1242,6 +1266,153 @@ export namespace DonderHiroba {
         export async function getScoreData(data: { token?: string, songNo: string, difficulty?: Difficulty }) {
             const { token, songNo, difficulty } = data;
             return parse.scoreData({ html: await request.scoreData({ token, songNo, difficulty: (difficulty as any) }), songNo });
+        }
+
+        /**
+         * 곡 점수 데이터를 새로고침합니다.
+         */
+        export async function updateScore(data: { token?: string }) {
+            const { token } = data;
+            try {
+                const headers: HeadersInit = {
+                    Accept: 'application/json, text/javascript, */*; q=0.01',
+                    'Accept-Encoding': 'gzip, deflate, br',
+                    'Accept-Language': 'ko,en;q=0.9,en-US;q=0.8',
+                    'Content-Length': '7',
+                    'Origin': 'https://donderhiroba.jp',
+                    Referer: 'https://donderhiroba.jp/score_list.php',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36 Edg/115.0.1901.183'
+                };
+                if (token) {
+                    headers.Cookie = '_token_v2=' + token;
+                }
+
+                //const body = new URLSearchParams();
+                //body.set('_tckt', ticket);
+
+                var response = await fetch('https://donderhiroba.jp/ajax/update_score.php', {
+                    headers,
+                    redirect: 'manual',
+                    method: 'post',
+                    //body
+                });
+
+                if (response.status !== 200) {
+                    throw response;
+                }
+            }
+            catch (err) {
+                console.log(err);
+                if (err instanceof Response) {
+                    throw new HirobaError('CANNOT_CONNECT', err);
+                }
+                else {
+                    throw new HirobaError('CANNOT_CONNECT');
+                }
+            };
+
+            try {
+                const responseData = await response.json();
+
+                if (responseData.result === 0) {
+                    return;
+                }
+                else {
+                    throw response;
+                }
+            }
+            catch (err) {
+                if (err instanceof Response) {
+                    throw new HirobaError('UNKNOWN_ERROR', err);
+                }
+                else {
+                    throw new HirobaError('UNKNOWN_ERROR');
+                }
+            }
+        }
+
+        /**
+         * 닉네임을 변경합니다.
+         * @param data 
+         * @returns 
+         */
+        export async function changeName(data: { token?: string, ticket: string, newName: string }) {
+            const { token, ticket, newName } = data;
+            try {
+                const body = new URLSearchParams({
+                    '_tckt': ticket,
+                    newName,
+                    mode: 'name'
+                });
+
+                const headers: HeadersInit = {
+                    "accept": "application/json, text/javascript, */*; q=0.01",
+                    "accept-language": "ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7",
+                    "content-type": "application/x-www-form-urlencoded; charset=UTF-8",
+                    "priority": "u=0, i",
+                    "sec-ch-ua": "\"Not)A;Brand\";v=\"8\", \"Chromium\";v=\"138\", \"Google Chrome\";v=\"138\"",
+                    "sec-ch-ua-mobile": "?0",
+                    "sec-ch-ua-platform": "\"macOS\"",
+                    "sec-fetch-dest": "empty",
+                    "sec-fetch-mode": "cors",
+                    "sec-fetch-site": "same-origin",
+                    "x-requested-with": "XMLHttpRequest",
+                    "Referer": "https://donderhiroba.jp/mypage_top.php",
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36 Edg/115.0.1901.183'
+                };
+
+                if (token) {
+                    headers.Cookie = '_token_v2=' + token;
+                }
+
+                var response = await fetch(`https://donderhiroba.jp/ajax/change_mydon_profile.php`, {
+                    method: 'post',
+                    headers,
+                    redirect: 'manual',
+                    body
+                });
+
+                if (response.status !== 200) {
+                    throw response;
+                }
+            }
+            catch (err) {
+                if (err instanceof Response) {
+                    throw new HirobaError('CANNOT_CONNECT', err);
+                }
+                else {
+                    throw new HirobaError('CANNOT_CONNECT');
+                }
+            };
+
+            try {
+                const responseData = await response.json();
+
+                if (responseData.result === 0) {
+                    return;
+                }
+                else {
+                    throw response;
+                }
+            }
+            catch (err) {
+                if (err instanceof Response) {
+                    throw new HirobaError('UNKNOWN_ERROR', err);
+                }
+                else {
+                    throw new HirobaError('UNKNOWN_ERROR');
+                }
+            }
+        }
+
+        /**
+         * 닉네임 변경을 위한 ticket 값을 가져옵니다.
+         * @param data 
+         * @returns 
+         */
+        export async function getTicket(data?: { token?: string }) {
+            return parse.ticket(await request.ticket(data));
         }
     }
 }
