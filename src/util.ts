@@ -28,7 +28,7 @@ export function createHeader(cookie?: string) {
 }
 
 export class HirobaError extends Error {
-    code: string;
+    code: HirobaErrorCode;
     response?: Response;
 
     constructor(code: HirobaErrorCode, response?: Response) {

@@ -5,7 +5,109 @@ import { CompeDate } from "./compeDate";
 import { HTMLElement } from "node-html-parser";
 
 export class DonderHiroba {
+    private token?: string;
+    namcoLogined: boolean = false;
+    cardLogined: boolean = false;
+    currentLogin: CardData | null = null;
+    cardList: CardData[] = [];
 
+    constructor(token?: string) {
+        this.token = token;
+    }
+
+    /**
+     * 남코 계정에 로그인 되어있는 지 체크합니다. 이 함수를 사용하면 카드 로그인이 풀립니다.
+     * @returns
+     */
+    async checkNamcoLogined() {
+        this.cardLogined = false;
+        this.namcoLogined = false;
+
+        try {
+            await DonderHiroba.func.getCardList({ token: this.token });
+            this.namcoLogined = true;
+            return true;
+        }
+        catch {
+            return false;
+        }
+    }
+
+    /**
+     * 카드에 로그인 되어있는 지 체크합니다. 이 함수를 사용하면 남코 로그인이 풀릴 수 있습니다.
+     * @returns 
+     */
+    async checkCardLogined() {
+        this.namcoLogined = false;
+        this.cardLogined = false;
+
+        try {
+            this.currentLogin = await DonderHiroba.func.getCurrentLogin();
+            if (this.currentLogin) {
+                this.namcoLogined = true;
+                this.cardLogined = true;
+                return true;
+            }
+            else {
+                return false;
+            }
+        }
+        catch {
+            return false;
+        }
+    }
+
+    /**
+     * 카드 리스트를 다시 로드합니다.
+     */
+    async reloadCardList() {
+        this.cardList = await DonderHiroba.func.getCardList({ token: this.token });
+    }
+
+    /**
+     * 카드에 로그인합니다.
+     * @param taikoNumber 
+     */
+    async cardLogin(taikoNumber: string) {
+        try {
+            this.currentLogin = await this.loginedCheckWarapper(async () => {
+                return await DonderHiroba.func.cardLogin({
+                    token: this.token,
+                    taikoNumber,
+                    cardList: this.cardList
+                });
+            })
+        }
+        catch (err) {
+            if (err instanceof HirobaError && err.code === 'NO_MATCHED_CARD') {
+                await this.reloadCardList();
+                await this.cardLogin(taikoNumber);
+            }
+            else {
+                throw err;
+            }
+        }
+    }
+
+    /**
+     * 에러 발생 시 에러가 로그인과 관련된 에러라면 해당하는 속성을 초기화합니다.
+     * @param callback 
+     * @returns 
+     */
+    private async loginedCheckWarapper<T = void>(callback: () => (T | Promise<T>)) {
+        try {
+            return await callback();
+        }
+        catch (err) {
+            if (err instanceof HirobaError && (err.code === 'NOT_LOGINED' || err.code === 'NOT_NAMCO_LOGINED')) {
+                this.namcoLogined = false;
+                this.cardLogined = false;
+                this.currentLogin = null;
+                this.cardList = [];
+            }
+            throw err;
+        }
+    }
 }
 
 export namespace DonderHiroba {
