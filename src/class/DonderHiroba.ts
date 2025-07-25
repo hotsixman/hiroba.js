@@ -40,7 +40,7 @@ export class DonderHiroba {
         this.namcoLogined = false;
 
         try {
-            await DonderHiroba.func.getCardList({ token: this.token });
+            this.cardList = await DonderHiroba.func.getCardList({ token: this.token });
             this.namcoLogined = true;
             return true;
         }
@@ -75,6 +75,7 @@ export class DonderHiroba {
 
     /**
      * 카드 리스트를 다시 로드합니다.
+     * 이 경우 카드 로그인이 풀립니다.
      */
     async reloadCardList() {
         this.cardList = await DonderHiroba.func.getCardList({ token: this.token });
