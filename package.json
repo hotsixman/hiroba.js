@@ -1,6 +1,6 @@
 {
   "name": "hiroba-js",
-  "version": "1.7.7",
+  "version": "2.0.0",
   "description": "Donderhiroba for js.",
   "main": "./cjs/index.js",
   "module": "./esm/index.js",
@@ -8,8 +8,7 @@
     ".": {
       "import": "./esm/index.js",
       "require": "./cjs/index.js"
-    },
-    "./types": "./src/types/types.js"
+    }
   },
   "scripts": {
     "build": "npm run build:cjs & npm run build:esm",
@@ -19,11 +18,13 @@
   "keywords": [],
   "author": "hotsixman",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/hotsixman/hiroba.js"
+  },
   "dependencies": {
-    "axios": "^1.6.2",
     "cheerio": "^1.0.0-rc.12",
     "fs": "^0.0.1-security",
-    "i": "^0.3.7",
     "jimp": "^1.6.0",
     "node-html-parser": "^7.0.1",
     "npm": "^11.4.2",

@@ -5,11 +5,27 @@ import { CompeDate } from "./compeDate";
 import { HTMLElement } from "node-html-parser";
 
 export class DonderHiroba {
+    static async login({ email, password, taikoNumber }: { email: string, password: string, taikoNumber?: string }) {
+        const token = await DonderHiroba.func.getSessionToken({ email, password });
+
+        const instance = new DonderHiroba(token);
+        instance.namcoLogined = true;
+
+        if (taikoNumber) {
+            await instance.cardLogin(taikoNumber);
+        }
+
+        return instance;
+    }
+
     private token?: string;
     namcoLogined: boolean = false;
     cardLogined: boolean = false;
     currentLogin: CardData | null = null;
     cardList: CardData[] = [];
+    clearData: Map<string, ClearData> = new Map();
+    scoreData: Map<string, ScoreData> = new Map();
+    ticket: string | null = null;
 
     constructor(token?: string) {
         this.token = token;
@@ -70,13 +86,14 @@ export class DonderHiroba {
      */
     async cardLogin(taikoNumber: string) {
         try {
-            this.currentLogin = await this.loginedCheckWarapper(async () => {
+            this.currentLogin = await this.loginedCheckWrapper(async () => {
                 return await DonderHiroba.func.cardLogin({
                     token: this.token,
                     taikoNumber,
                     cardList: this.cardList
                 });
-            })
+            });
+            this.cardLogined = true;
         }
         catch (err) {
             if (err instanceof HirobaError && err.code === 'NO_MATCHED_CARD') {
@@ -90,11 +107,97 @@ export class DonderHiroba {
     }
 
     /**
+     * 클리어 데이터를 업데이트하고, 업데이트 된 클리어 데이터를 {songNo: ClearData} 형태의 객체로 반환합니다.
+     * @param genre 
+     * @returns 
+     */
+    async updateClearData(genre?: keyof typeof Const.genre) {
+        const clearDataHtml = await this.loginedCheckWrapper<Promise<string | string[]>>(() => genre ? DonderHiroba.request.clearData({ token: this.token, genre }) : DonderHiroba.request.clearData({ token: this.token }));
+        const clearData: ClearData[] = [];
+        if (Array.isArray(clearDataHtml)) {
+            clearDataHtml.forEach((html) => {
+                clearData.push(...DonderHiroba.parse.clearData(html));
+            });
+            this.ticket = DonderHiroba.parse.ticket(clearDataHtml[clearDataHtml.length - 1]);
+        }
+        else {
+            clearData.push(...DonderHiroba.parse.clearData(clearDataHtml));
+            this.ticket = DonderHiroba.parse.ticket(clearDataHtml);
+        }
+
+        const clearDataRecord: Record<string, ClearData> = {};
+        clearData.forEach((e) => {
+            this.clearData.set(e.songNo, e);
+            clearDataRecord[e.songNo] = e;
+        });
+
+        return clearDataRecord;
+    }
+
+    /**
+     * 점수 데이터를 업데이트하고, 업데이트 된 점수 데이터를 반환합니다.
+     * @param songNo 
+     * @param difficulty 
+     * @returns 
+     */
+    async updateScoreData(songNo: string, difficulty?: Difficulty) {
+        const scoreDataHtml = await this.loginedCheckWrapper<Promise<string | string[]>>(() => difficulty ? DonderHiroba.request.scoreData({ token: this.token, songNo, difficulty }) : DonderHiroba.request.scoreData({ token: this.token, songNo }));
+        if (Array.isArray(scoreDataHtml)) {
+            var scoreData = DonderHiroba.parse.scoreData({ html: scoreDataHtml, songNo });
+            this.ticket = DonderHiroba.parse.ticket(scoreDataHtml[scoreDataHtml.length - 1]);
+        }
+        else {
+            var scoreData = DonderHiroba.parse.scoreData({ html: scoreDataHtml, songNo });
+            this.ticket = DonderHiroba.parse.ticket(scoreDataHtml);
+        }
+
+        if (!scoreData) return null;
+
+        let existingScoreData = this.scoreData.get(songNo);
+        if (!existingScoreData) {
+            existingScoreData = scoreData;
+            this.scoreData.set(songNo, existingScoreData);
+        }
+        else {
+            for (const [diff, diffScoreData] of Object.entries(scoreData.difficulty)) {
+                existingScoreData.difficulty[diff as Difficulty] = diffScoreData;
+            }
+        };
+
+        return existingScoreData;
+    }
+
+    async updateRecord(){
+        //if(!this.ticket){
+        //    await this.getTicket();
+        //}
+
+        await DonderHiroba.func.updateRecord({token: this.token});
+    }
+
+    async changeName(newName: string) {
+        if (!this.ticket) {
+            await this.getTicket();
+        }
+
+        await DonderHiroba.func.changeName({ token: this.token, ticket: this.ticket as string, newName });
+        await this.checkCardLogined();
+
+        return this.currentLogin;
+    }
+
+    async getTicket() {
+        const ticket = await this.loginedCheckWrapper(() => DonderHiroba.func.getTicket({ token: this.token }));
+        this.ticket = ticket;
+        return ticket;
+    }
+
+    /**
      * 에러 발생 시 에러가 로그인과 관련된 에러라면 해당하는 속성을 초기화합니다.
      * @param callback 
      * @returns 
      */
-    private async loginedCheckWarapper<T = void>(callback: () => (T | Promise<T>)) {
+    private async loginedCheckWrapper<T = void>(callback: () => (T | Promise<T>)) {
         try {
             return await callback();
         }
@@ -1373,7 +1476,7 @@ export namespace DonderHiroba {
         /**
          * 곡 점수 데이터를 새로고침합니다.
          */
-        export async function updateScore(data: { token?: string }) {
+        export async function updateRecord(data: { token?: string }) {
             const { token } = data;
             try {
                 const headers: HeadersInit = {
