@@ -168,12 +168,12 @@ export class DonderHiroba {
         return existingScoreData;
     }
 
-    async updateRecord(){
+    async updateRecord() {
         //if(!this.ticket){
         //    await this.getTicket();
         //}
 
-        await DonderHiroba.func.updateRecord({token: this.token});
+        await DonderHiroba.func.updateRecord({ token: this.token });
     }
 
     async changeName(newName: string) {
@@ -1352,7 +1352,11 @@ export namespace DonderHiroba {
 
                 response = await fetch('https://donderhiroba.jp/login_select.php', {
                     method: 'post',
-                    headers: createHeader(token ? `_token_v2=${token}` : undefined),
+                    headers: {
+                        'content-type': "application/x-www-form-urlencoded; charset=UTF-8",
+                        ...createHeader(token ? `_token_v2=${token}` : undefined),
+
+                    },
                     redirect: 'manual',
                     body: params
                 });
