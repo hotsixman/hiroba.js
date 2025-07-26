@@ -205,7 +205,7 @@ export class DonderHiroba {
      * @param callback 
      * @returns 
      */
-    private async loginedCheckWrapper<T = void>(callback: () => (T | Promise<T>)) {
+    protected async loginedCheckWrapper<T = void>(callback: () => (T | Promise<T>)) {
         try {
             return await callback();
         }
