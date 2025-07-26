@@ -207,6 +207,17 @@ export class DonderHiroba {
         return this.token;
     }
 
+    initialize() {
+        this.token = undefined;
+        this.namcoLogined = false;
+        this.cardLogined = false;
+        this.currentLogin = null;
+        this.cardList = [];
+        this.clearData = new Map<string, ClearData>();
+        this.scoreData = new Map<string, ScoreData>();
+        this.ticket = null;
+    }
+
     /**
      * 에러 발생 시 에러가 로그인과 관련된 에러라면 해당하는 속성을 초기화합니다.
      * @param callback 
@@ -1502,7 +1513,6 @@ export namespace DonderHiroba {
                     Accept: 'application/json, text/javascript, */*; q=0.01',
                     'Accept-Encoding': 'gzip, deflate, br',
                     'Accept-Language': 'ko,en;q=0.9,en-US;q=0.8',
-                    'Content-Length': '7',
                     'Origin': 'https://donderhiroba.jp',
                     Referer: 'https://donderhiroba.jp/score_list.php',
                     'X-Requested-With': 'XMLHttpRequest',
