@@ -193,6 +193,13 @@ export class DonderHiroba {
         return ticket;
     }
 
+    setToken(token: string){
+        this.token = token;
+    }
+    getToken(){
+        return this.token;
+    }
+
     /**
      * 에러 발생 시 에러가 로그인과 관련된 에러라면 해당하는 속성을 초기화합니다.
      * @param callback 
