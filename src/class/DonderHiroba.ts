@@ -18,7 +18,7 @@ export class DonderHiroba {
         return instance;
     }
 
-    private token?: string;
+    protected token?: string;
     namcoLogined: boolean = false;
     cardLogined: boolean = false;
     currentLogin: CardData | null = null;
