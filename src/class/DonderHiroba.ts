@@ -38,6 +38,7 @@ export class DonderHiroba {
     async checkNamcoLogined() {
         this.cardLogined = false;
         this.namcoLogined = false;
+        this.currentLogin = null;
 
         try {
             this.cardList = await DonderHiroba.func.getCardList({ token: this.token });
@@ -78,7 +79,13 @@ export class DonderHiroba {
      * 이 경우 카드 로그인이 풀립니다.
      */
     async reloadCardList() {
-        this.cardList = await DonderHiroba.func.getCardList({ token: this.token });
+        const lastLogin = this.currentLogin;
+        this.cardLogined = false;
+        this.currentLogin = null;
+        this.cardList = await this.loginedCheckWrapper(() => DonderHiroba.func.getCardList({ token: this.token }));
+        if (lastLogin && this.cardList.find((e) => e.taikoNumber === lastLogin?.taikoNumber)) {
+            await this.cardLogin(lastLogin.taikoNumber);
+        }
     }
 
     /**
@@ -193,10 +200,10 @@ export class DonderHiroba {
         return ticket;
     }
 
-    setToken(token: string){
+    setToken(token: string) {
         this.token = token;
     }
-    getToken(){
+    getToken() {
         return this.token;
     }
 
