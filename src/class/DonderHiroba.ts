@@ -180,7 +180,7 @@ export class DonderHiroba {
         //    await this.getTicket();
         //}
 
-        await DonderHiroba.func.updateRecord({ token: this.token });
+        await DonderHiroba.func.updateRecord({ token: this.token, ticket: this.ticket ?? undefined });
     }
 
     async changeName(newName: string) {
@@ -1243,9 +1243,12 @@ export namespace DonderHiroba {
                     params.append(key, `${value}`);
                 }
 
+                const headers = createHeader();
+                headers.set('Content-Type', 'application/x-www-form-urlencoded')
+
                 response = await fetch('https://account-api.bandainamcoid.com/v3/login/idpw', {
                     method: 'post',
-                    headers: { 'Content-Type': 'application/x-www-form-urlencoded', ...createHeader() },
+                    headers,
                     body: params
                 });
 
@@ -1375,13 +1378,12 @@ export namespace DonderHiroba {
                 params.set('id_pos', `${matchedCardIndex + 1}`);
                 params.set('mode', 'exec');
 
+                const headers = createHeader(token ? `_token_v2=${token}` : undefined);
+                headers.set('content-type', "application/x-www-form-urlencoded; charset=UTF-8")
+
                 response = await fetch('https://donderhiroba.jp/login_select.php', {
                     method: 'post',
-                    headers: {
-                        'content-type': "application/x-www-form-urlencoded; charset=UTF-8",
-                        ...createHeader(token ? `_token_v2=${token}` : undefined),
-
-                    },
+                    headers,
                     redirect: 'manual',
                     body: params
                 });
@@ -1506,11 +1508,12 @@ export namespace DonderHiroba {
         /**
          * 곡 점수 데이터를 새로고침합니다.
          */
-        export async function updateRecord(data: { token?: string }) {
-            const { token } = data;
+        export async function updateRecord(data?: { token?: string, ticket?: string }) {
+            const { token, ticket } = data ?? {};
             try {
                 const headers: HeadersInit = {
                     Accept: 'application/json, text/javascript, */*; q=0.01',
+                    "content-type": "application/x-www-form-urlencoded; charset=UTF-8",
                     'Accept-Encoding': 'gzip, deflate, br',
                     'Accept-Language': 'ko,en;q=0.9,en-US;q=0.8',
                     'Origin': 'https://donderhiroba.jp',
@@ -1522,14 +1525,14 @@ export namespace DonderHiroba {
                     headers.Cookie = '_token_v2=' + token;
                 }
 
-                //const body = new URLSearchParams();
-                //body.set('_tckt', ticket);
+                const body = new URLSearchParams();
+                body.set('_tckt', ticket ?? await getTicket(data));
 
                 var response = await fetch('https://donderhiroba.jp/ajax/update_score.php', {
                     headers,
                     redirect: 'manual',
                     method: 'post',
-                    //body
+                    body
                 });
 
                 if (response.status !== 200) {
@@ -1646,7 +1649,7 @@ export namespace DonderHiroba {
          * @returns 
          */
         export async function getTicket(data?: { token?: string }) {
-            return parse.ticket(await request.ticket(data));
+            return parse.ticket(await request.ticket(data)) as string;
         }
     }
 }
