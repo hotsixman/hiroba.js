@@ -25,7 +25,6 @@ export class DonderHiroba {
     cardList: CardData[] = [];
     clearData: Map<string, ClearData> = new Map();
     scoreData: Map<string, ScoreData> = new Map();
-    ticket: string | null = null;
 
     constructor(token?: string) {
         this.token = token;
@@ -115,22 +114,20 @@ export class DonderHiroba {
     }
 
     /**
-     * 클리어 데이터를 업데이트하고, 업데이트 된 클리어 데이터를 {songNo: ClearData} 형태의 객체로 반환합니다.
+     * 클리어 데이터를 동기화하고, 동기화 된 클리어 데이터를 {songNo: ClearData} 형태의 객체로 반환합니다.
      * @param genre 
      * @returns 
      */
-    async updateClearData(genre?: keyof typeof Const.genre) {
+    async syncClearData(genre?: keyof typeof Const.genre) {
         const clearDataHtml = await this.loginedCheckWrapper<Promise<string | string[]>>(() => genre ? DonderHiroba.request.clearData({ token: this.token, genre }) : DonderHiroba.request.clearData({ token: this.token }));
         const clearData: ClearData[] = [];
         if (Array.isArray(clearDataHtml)) {
             clearDataHtml.forEach((html) => {
                 clearData.push(...DonderHiroba.parse.clearData(html));
             });
-            this.ticket = DonderHiroba.parse.ticket(clearDataHtml[clearDataHtml.length - 1]);
         }
         else {
             clearData.push(...DonderHiroba.parse.clearData(clearDataHtml));
-            this.ticket = DonderHiroba.parse.ticket(clearDataHtml);
         }
 
         const clearDataRecord: Record<string, ClearData> = {};
@@ -143,20 +140,18 @@ export class DonderHiroba {
     }
 
     /**
-     * 점수 데이터를 업데이트하고, 업데이트 된 점수 데이터를 반환합니다.
+     * 점수 데이터를 동기화하고, 동기화 된 점수 데이터를 반환합니다.
      * @param songNo 
      * @param difficulty 
      * @returns 
      */
-    async updateScoreData(songNo: string, difficulty?: Difficulty) {
+    async syncScoreData(songNo: string, difficulty?: Difficulty) {
         const scoreDataHtml = await this.loginedCheckWrapper<Promise<string | string[]>>(() => difficulty ? DonderHiroba.request.scoreData({ token: this.token, songNo, difficulty }) : DonderHiroba.request.scoreData({ token: this.token, songNo }));
         if (Array.isArray(scoreDataHtml)) {
             var scoreData = DonderHiroba.parse.scoreData({ html: scoreDataHtml, songNo });
-            this.ticket = DonderHiroba.parse.ticket(scoreDataHtml[scoreDataHtml.length - 1]);
         }
         else {
             var scoreData = DonderHiroba.parse.scoreData({ html: scoreDataHtml, songNo });
-            this.ticket = DonderHiroba.parse.ticket(scoreDataHtml);
         }
 
         if (!scoreData) return null;
@@ -176,28 +171,16 @@ export class DonderHiroba {
     }
 
     async updateRecord() {
-        //if(!this.ticket){
-        //    await this.getTicket();
-        //}
-
-        await DonderHiroba.func.updateRecord({ token: this.token, ticket: this.ticket ?? undefined });
+        await DonderHiroba.func.updateRecord({ token: this.token });
     }
 
     async changeName(newName: string) {
-        if (!this.ticket) {
-            await this.getTicket();
-        }
+        const ticket = await this.loginedCheckWrapper(async () => DonderHiroba.parse.ticket(await DonderHiroba.request.mypage({ token: this.token }))) ?? '';
 
-        await DonderHiroba.func.changeName({ token: this.token, ticket: this.ticket as string, newName });
+        await DonderHiroba.func.changeName({ token: this.token, ticket, newName });
         await this.checkCardLogined();
 
         return this.currentLogin;
-    }
-
-    async getTicket() {
-        const ticket = await this.loginedCheckWrapper(() => DonderHiroba.func.getTicket({ token: this.token }));
-        this.ticket = ticket;
-        return ticket;
     }
 
     setToken(token: string) {
@@ -215,7 +198,6 @@ export class DonderHiroba {
         this.cardList = [];
         this.clearData = new Map<string, ClearData>();
         this.scoreData = new Map<string, ScoreData>();
-        this.ticket = null;
     }
 
     /**
@@ -509,7 +491,7 @@ export namespace DonderHiroba {
             }
         }
 
-        export async function ticket(data?: { token?: string }) {
+        export async function mypage(data?: { token?: string }) {
             const { token } = data ?? {};
 
             try {
@@ -1522,11 +1504,11 @@ export namespace DonderHiroba {
                     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36 Edg/115.0.1901.183'
                 };
                 if (token) {
-                    headers.Cookie = '_token_v2=' + token;
+                    headers.Cookie = `_token_v2=${token};`;
                 }
 
                 const body = new URLSearchParams();
-                body.set('_tckt', ticket ?? await getTicket(data));
+                body.set('_tckt', ticket ?? DonderHiroba.parse.ticket(await DonderHiroba.request.clearData({ token, genre: 'pops' })) ?? '');
 
                 var response = await fetch('https://donderhiroba.jp/ajax/update_score.php', {
                     headers,
@@ -1600,7 +1582,7 @@ export namespace DonderHiroba {
                 };
 
                 if (token) {
-                    headers.Cookie = '_token_v2=' + token;
+                    headers.Cookie = `_token_v2=${token};`;
                 }
 
                 var response = await fetch(`https://donderhiroba.jp/ajax/change_mydon_profile.php`, {
@@ -1648,8 +1630,8 @@ export namespace DonderHiroba {
          * @param data 
          * @returns 
          */
-        export async function getTicket(data?: { token?: string }) {
-            return parse.ticket(await request.ticket(data)) as string;
-        }
+        //export async function getTicket(data?: { token?: string }) {
+        //    return parse.ticket(await request.ticket(data)) as string;
+        //}
     }
 }
