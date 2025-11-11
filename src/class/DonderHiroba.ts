@@ -1,7 +1,7 @@
-import { Badge, CardData, Clear, ClearData, CompeDetail, CompeSongData, Crown, DaniData, Difficulty, RankingData, BestScore, Condition, SongRecord, ScoreData, DifficultyScoreData } from "../types/types";
-import { checkNamcoLogin, Const, createHeader, HirobaError, sanitizeHTML, parseHTML, isBrowser, checkCardLogin } from "../util";
+import { Badge, CardData, Clear, ClearData, CompeDetail, CompeSongData, Crown, DaniData, Difficulty, RankingData, BestScore, Condition, SongRecord, ScoreData, DifficultyScoreData, DaniPassData, DaniNo } from "../types/types.js";
+import { checkNamcoLogin, Const, createHeader, HirobaError, sanitizeHTML, parseHTML, isBrowser, checkCardLogin, detectDaniPass } from "../util.js";
 import setCookieParser from 'set-cookie-parser';
-import { CompeDate } from "./compeDate";
+import { CompeDate } from "./compeDate.js";
 import { HTMLElement } from "node-html-parser";
 
 export class DonderHiroba {
@@ -513,6 +513,57 @@ export namespace DonderHiroba {
             if (!logined) throw error;
 
             return await response.text();
+        }
+
+        export async function daniPlate(data: { token?: string }): Promise<Blob[]>;
+        export async function daniPlate(data: { token?: string, dan: DaniNo }): Promise<Blob>;
+        export async function daniPlate({ token, dan }: { token?: string, dan?: DaniNo }): Promise<Blob | Blob[]> {
+            if (dan) {
+                try {
+                    var response = await fetch(`https://donderhiroba.jp/imgsrc_dani.php?taiko_no=353820166716&dan=${dan}&img=0`, {
+                        headers: createHeader(token ? `_token_v2=${token}` : undefined),
+                        redirect: 'manual'
+                    });
+                }
+                catch (err) {
+                    if (err instanceof Response) {
+                        throw new HirobaError('CANNOT_CONNECT', err);
+                    }
+                    else {
+                        throw new HirobaError('CANNOT_CONNECT');
+                    }
+                }
+
+                const { logined, error } = checkCardLogin(response);
+                if (!logined) throw error;
+
+                return await response.blob();
+            }
+            else {
+                const imgBlobs: Blob[] = [];
+                for (let i = 1; i <= 19; i++) {
+                    try {
+                        var response = await fetch(`https://donderhiroba.jp/imgsrc_dani.php?taiko_no=353820166716&dan=${i}&img=0`, {
+                            headers: createHeader(token ? `_token_v2=${token}` : undefined),
+                            redirect: 'manual'
+                        });
+                    }
+                    catch (err) {
+                        if (err instanceof Response) {
+                            throw new HirobaError('CANNOT_CONNECT', err);
+                        }
+                        else {
+                            throw new HirobaError('CANNOT_CONNECT');
+                        }
+                    }
+
+                    const { logined, error } = checkCardLogin(response);
+                    if (!logined) throw error;
+
+                    imgBlobs.push(await response.blob());
+                };
+                return imgBlobs;
+            }
         }
     }
 
@@ -1191,6 +1242,21 @@ export namespace DonderHiroba {
                 }
             }
         }
+
+        export async function daniPass(data: { img: Blob }): Promise<DaniPassData>;
+        export async function daniPass(data: { img: Blob[] }): Promise<Record<DaniNo, DaniPassData>>;
+        export async function daniPass({ img }: { img: Blob | Blob[] }): Promise<DaniPassData | Record<DaniNo, DaniPassData>> {
+            if (Array.isArray(img)) {
+                const result: Partial<Record<DaniNo, DaniPassData>> = {};
+                for(let [key, value] of Object.entries(img)){
+                    result[Number(key) + 1 as DaniNo] = await detectDaniPass(value);
+                }
+                return result as Record<DaniNo, DaniPassData>;
+            }
+            else {
+                return await detectDaniPass(img);
+            }
+        }
     }
 
     export namespace func {
@@ -1623,6 +1689,14 @@ export namespace DonderHiroba {
                     throw new HirobaError('UNKNOWN_ERROR');
                 }
             }
+        }
+
+        export async function getDaniPass(data: { token?: string }): Promise<Record<DaniNo, DaniPassData>>;
+        export async function getDaniPass(data: { token?: string, dan: DaniNo }): Promise<DaniPassData>;
+        export async function getDaniPass(data: { token?: string, dan?: DaniNo }): Promise<DaniPassData | Record<DaniNo, DaniPassData>> {
+            return await DonderHiroba.parse.daniPass({
+                img: await DonderHiroba.request.daniPlate(data)
+            });
         }
 
         /**

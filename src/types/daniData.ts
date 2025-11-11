@@ -1,4 +1,4 @@
-export type DaniNo = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 17 | 18 | 19
+export type DaniNo = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 17 | 18 | 19;
 
 export interface DaniData {
     title: string;
@@ -38,3 +38,8 @@ export interface SongRecord {
     maxCombo: number
     hit: number
 }
+
+export type DaniPassData = {
+    pass: "gold" | "red";
+    frame: "silver" | "gold" | "donderfull";
+} | null;

@@ -107,6 +107,11 @@ The `DonderHiroba.func` namespace is an object containing high-level functions t
     - **`updateRecord(data: { token?: string }): Promise<void>`**: Refreshes the song score data.
     - **`changeName(data: { token?: string, ticket: string, newName: string }): Promise<void>`**: Changes the nickname.
     - **`getTicket(data?: { token?: string }): Promise<string | null>`**: Fetches the `ticket` value required for changing the nickname.
+    - **`getDaniPass(data: { token?: string, dan?: DaniNo }): Promise<DaniPassData | Record<DaniNo, DaniPassData>>`**: Fetches and parses the Dan-i Pass images.
+      - **`data`** (object):
+        - **`token`** (`string`, optional): The session token.
+        - **`dan`** (`DaniNo`, optional): The specific Dan-i number to fetch. If omitted, all available Dan-i Passes will be fetched. (1 is 5kyu, and 19 is tatsujin)
+      - **Returns**: A `Promise` that resolves with `DaniPassData` if a specific `dan` is provided, or a `Record<DaniNo, DaniPassData>` if `dan` is omitted.
 
 ### `DonderHiroba.request`
 
@@ -120,6 +125,11 @@ The `DonderHiroba.request` namespace is an object containing functions that send
     - **`compeDetail(data: { token?: string, compeId: string }): Promise<string>`**: Fetches the HTML of the competition details page.
     - **`compeRanking(data: { token?: string, compeId: string }): Promise<string>`**: Fetches the HTML of the competition ranking page.
     - **`currentLogin(data?: { token?: string }): Promise<string>`**: Fetches the HTML of the main page to get the currently logged-in card information.
+    - **`daniPlate(data: { token?: string, dan?: DaniNo }): Promise<Blob | Blob[]>`**: Fetches the Dan-i Pass image(s) as a Blob.
+      - **`data`** (object):
+        - **`token`** (`string`, optional): The session token.
+        - **`dan`** (`DaniNo`, optional): The specific Dan-i number to fetch the image for. If omitted, all available Dan-i Pass images will be fetched.
+      - **Returns**: A `Promise` that resolves with a `Blob` if a specific `dan` is provided, or an array of `Blob`s if `dan` is omitted.
     - **`ticket(data?: { token?: string }): Promise<string>`**: Fetches the HTML of the My Page.
 
 ### `DonderHiroba.parse`
@@ -134,4 +144,8 @@ The `DonderHiroba.parse` namespace is an object containing functions that parse 
     - **`compeDetail(html: string): CompeDetail | null`**: Parses the competition details HTML and returns a `CompeDetail` object.
     - **`compeRanking(html: string): RankingData[] | null`**: Parses the competition ranking HTML and returns an array of `RankingData` objects.
     - **`currentLogin(html: string): CardData | null`**: Parses the main page HTML and returns the currently logged-in `CardData` object.
+    - **`daniPass(data: { img: Blob | Blob[] }): Promise<DaniPassData | Record<DaniNo, DaniPassData>>`**: Parses the Dan-i Pass image(s) (Blob) and extracts the pass type and edge type.
+      - **`data`** (object):
+        - **`img`** (`Blob | Blob[]`): The image data (Blob) or an array of image data (Blobs) to parse.
+      - **Returns**: A `Promise` that resolves with `DaniPassData` if a single `Blob` is provided, or a `Record<DaniNo, DaniPassData>` if an array of `Blob`s is provided. `DaniPassData` contains `pass` (gold or red) and `edge` (silver, gold, or donderfull).
     - **`ticket(html: string): string | null`**: Parses the `ticket` value from the My Page HTML.

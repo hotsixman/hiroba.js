@@ -1,6 +1,7 @@
 import { load } from "cheerio";
 import { type intToRGBA, type Jimp } from "jimp";
 import { parse as nodeHtmlParser, type HTMLElement } from 'node-html-parser';
+import { DaniPassData } from "./types/daniData";
 
 export function createHeader(cookie?: string) {
     const headers: Record<string, string> = {
@@ -114,7 +115,7 @@ export function sanitizeHTML(html: string) {
 }
 
 let jimp: { Jimp: typeof Jimp, intToRGBA: typeof intToRGBA } | null = null;
-export async function detectDaniPass(image: Blob) {
+export async function detectDaniPass(image: Blob): Promise<DaniPassData> {
     const pixelExtractor = await getPixelExtractor(image);
     if (!pixelExtractor) return null;
 
@@ -128,19 +129,19 @@ export async function detectDaniPass(image: Blob) {
     }
     if (!pass) return null;
 
-    const edgeRgb = pixelExtractor(435, 132);
-    let edge: 'silver' | 'gold' | 'donderfull';
-    if (isSameRgb(edgeRgb, { r: 213, g: 213, b: 214 })) {
-        edge = 'silver';
+    const frameRgb = pixelExtractor(435, 132);
+    let frame: 'silver' | 'gold' | 'donderfull';
+    if (isSameRgb(frameRgb, { r: 213, g: 213, b: 214 })) {
+        frame = 'silver';
     }
-    else if (isSameRgb(edgeRgb, { r: 243, g: 190, b: 37 })) {
-        edge = 'gold';
+    else if (isSameRgb(frameRgb, { r: 243, g: 190, b: 37 })) {
+        frame = 'gold';
     }
     else {
-        edge = 'donderfull';
+        frame = 'donderfull';
     }
 
-    return { pass, edge }
+    return { pass, frame }
 
 
     async function getPixelExtractor(image: Blob) {
