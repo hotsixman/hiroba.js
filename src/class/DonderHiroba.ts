@@ -928,7 +928,7 @@ export namespace DonderHiroba {
                     diff = 'hard';
                     break;
                 }
-                case ('image/sp/640/total_score_image_5.png'): {
+                case ('image/sp/640/total_score_image_4.png'): {
                     diff = 'oni';
                     break;
                 }
