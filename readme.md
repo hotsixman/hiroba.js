@@ -29,7 +29,7 @@ A `DonderHiroba` instance holds the state of a logged-in user, including their s
 
 - **`cardLogined: boolean`**: A boolean value that indicates whether the user is logged into a specific Taiko card. This is set to `true` after a successful card login.
 
-- **`currentLogin: CardData | null`**: An object containing the data of the currently logged-in card. It is `null` if no card is logged in.
+- **`currentLogin: (CardData & {summary?: Summary}) | null`**: An object containing the data of the currently logged-in card. It is `null` if no card is logged in.
 
 - **`cardList: CardData[]`**: An array of `CardData` objects, representing the user's Taiko cards.
 
@@ -103,7 +103,7 @@ The `DonderHiroba.func` namespace is an object containing high-level functions t
     - **`getCompeDetail(data: { token?: string, compeId: string }): Promise<CompeDetail | null>`**: Fetches the details of a competition.
     - **`getCompeRanking(data: { token?: string, compeId: string }): Promise<RankingData[] | null>`**: Fetches the ranking data for a competition.
     - **`getCompeData(data: { token?: string, compeId: string }): Promise<CompeData | null>`**: Fetches both the details and ranking data for a competition.
-    - **`getCurrentLogin(data?: { token?: string }): Promise<CardData | null>`**: Fetches the data of the currently logged-in card.
+    - **`getCurrentLogin(data?: { token?: string }): Promise<(CardData & {summary?: Summary}) | null>`**: Fetches the data of the currently logged-in card.
     - **`updateRecord(data: { token?: string }): Promise<void>`**: Refreshes the song score data.
     - **`changeName(data: { token?: string, ticket: string, newName: string }): Promise<void>`**: Changes the nickname.
     - **`getTicket(data?: { token?: string }): Promise<string | null>`**: Fetches the `ticket` value required for changing the nickname.
@@ -143,7 +143,7 @@ The `DonderHiroba.parse` namespace is an object containing functions that parse 
     - **`daniData(data: { html: string, daniNo: number } | { html: string, daniNo: number }[]): DaniData | DaniData[] | null`**: Parses the Dan-i Dojo data HTML and returns a `DaniData` object or an array of objects.
     - **`compeDetail(html: string): CompeDetail | null`**: Parses the competition details HTML and returns a `CompeDetail` object.
     - **`compeRanking(html: string): RankingData[] | null`**: Parses the competition ranking HTML and returns an array of `RankingData` objects.
-    - **`currentLogin(html: string): CardData | null`**: Parses the main page HTML and returns the currently logged-in `CardData` object.
+    - **`currentLogin(html: string): (CardData & {summary?: Summary}) | null`**: Parses the main page HTML and returns the currently logged-in `CardData` object.
     - **`daniPass(data: { img: Blob | Blob[] }): Promise<DaniPassData | Record<DaniNo, DaniPassData>>`**: Parses the Dan-i Pass image(s) (Blob) and extracts the pass type and edge type.
       - **`data`** (object):
         - **`img`** (`Blob | Blob[]`): The image data (Blob) or an array of image data (Blobs) to parse.
