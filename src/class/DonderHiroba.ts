@@ -1,4 +1,4 @@
-import { Badge, CardData, Clear, ClearData, CompeDetail, CompeSongData, Crown, DaniData, Difficulty, RankingData, BestScore, Condition, SongRecord, ScoreData, DifficultyScoreData, DaniPassData, DaniNo } from "../types/types.js";
+import { Badge, CardData, Clear, ClearData, CompeDetail, CompeSongData, Crown, DaniData, Difficulty, RankingData, BestScore, Condition, SongRecord, ScoreData, DifficultyScoreData, DaniPassData, DaniNo, Summary } from "../types/types.js";
 import { checkNamcoLogin, Const, createHeader, HirobaError, sanitizeHTML, parseHTML, isBrowser, checkCardLogin, detectDaniPass } from "../util.js";
 import setCookieParser from 'set-cookie-parser';
 import { CompeDate } from "./compeDate.js";
@@ -21,7 +21,7 @@ export class DonderHiroba {
     protected token?: string;
     namcoLogined: boolean = false;
     cardLogined: boolean = false;
-    currentLogin: CardData | null = null;
+    currentLogin: (CardData & { summary?: Summary }) | null = null;
     cardList: CardData[] = [];
     clearData: Map<string, ClearData> = new Map();
     scoreData: Map<string, ScoreData> = new Map();
@@ -875,7 +875,7 @@ export namespace DonderHiroba {
             return rankingDatas;
         }
 
-        export function currentLogin(html: string) {
+        export function currentLogin(html: string): (CardData & { summary?: Summary }) | null {
             const dom = parseHTML(html);
 
             const mydonArea = dom.querySelector('div#mydon_area');
@@ -905,7 +905,56 @@ export namespace DonderHiroba {
                 myDon
             };
 
-            return currentLogin;
+            const totalScore = dom.querySelector('.total_score');
+            if (!totalScore) {
+                return currentLogin;
+            }
+
+            const backgroundSrc = totalScore.querySelector('img')?.getAttribute('src');
+            if (!backgroundSrc) {
+                return currentLogin;
+            }
+            let diff: 'easy' | 'normal' | 'hard' | 'oni' | 'oniura' = 'oniura';
+            switch (backgroundSrc) {
+                case ('image/sp/640/total_score_image_1.png'): {
+                    diff = 'easy';
+                    break;
+                }
+                case ('image/sp/640/total_score_image_2.png'): {
+                    diff = 'normal';
+                    break;
+                }
+                case ('image/sp/640/total_score_image_3.png'): {
+                    diff = 'hard';
+                    break;
+                }
+                case ('image/sp/640/total_score_image_5.png'): {
+                    diff = 'oni';
+                    break;
+                }
+            }
+            const summary: Summary = {
+                diff,
+                crown: {
+                    donderfull: Number(totalScore.querySelector('.donderful_crown_count')?.textContent ?? '0'),
+                    gold: Number(totalScore.querySelector('.gold_crown_count')?.textContent ?? '0'),
+                    silver: Number(totalScore.querySelector('.silver_crown_count')?.textContent ?? '0')
+                },
+                badge: {
+                    rainbow: Number(totalScore.querySelector('.best_rank_score_8')?.textContent ?? '0'),
+                    purple: Number(totalScore.querySelector('.best_rank_score_7')?.textContent ?? '0'),
+                    pink: Number(totalScore.querySelector('.best_rank_score_6')?.textContent ?? '0'),
+                    gold: Number(totalScore.querySelector('.best_rank_score_5')?.textContent ?? '0'),
+                    silver: Number(totalScore.querySelector('.best_rank_score_4')?.textContent ?? '0'),
+                    bronze: Number(totalScore.querySelector('.best_rank_score_3')?.textContent ?? '0'),
+                    white: Number(totalScore.querySelector('.best_rank_score_2')?.textContent ?? '0'),
+                }
+            }
+
+            return {
+                ...currentLogin,
+                summary
+            };
         }
 
         export function daniData(data: { html: string, daniNo: number }): DaniData | null;
@@ -1248,7 +1297,7 @@ export namespace DonderHiroba {
         export async function daniPass({ img }: { img: Blob | Blob[] }): Promise<DaniPassData | Record<DaniNo, DaniPassData>> {
             if (Array.isArray(img)) {
                 const result: Partial<Record<DaniNo, DaniPassData>> = {};
-                for(let [key, value] of Object.entries(img)){
+                for (let [key, value] of Object.entries(img)) {
                     result[Number(key) + 1 as DaniNo] = await detectDaniPass(value);
                 }
                 return result as Record<DaniNo, DaniPassData>;
