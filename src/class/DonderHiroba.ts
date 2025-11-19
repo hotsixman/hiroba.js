@@ -1,4 +1,4 @@
-import { Badge, CardData, Clear, ClearData, CompeDetail, CompeSongData, Crown, DaniData, Difficulty, RankingData, BestScore, Condition, SongRecord, ScoreData, DifficultyScoreData, DaniPassData, DaniNo, Summary } from "../types/types.js";
+import { Badge, CardData, Clear, ClearData, CompeDetail, CompeSongData, Crown, DaniData, Difficulty, RankingData, BestScore, Condition, SongRecord, ScoreData, DifficultyScoreData, DaniPassData, DaniNo, Summary, RecentPlayed } from "../types/types.js";
 import { checkNamcoLogin, Const, createHeader, HirobaError, sanitizeHTML, parseHTML, isBrowser, checkCardLogin, detectDaniPass } from "../util.js";
 import setCookieParser from 'set-cookie-parser';
 import { CompeDate } from "./compeDate.js";
@@ -564,6 +564,29 @@ export namespace DonderHiroba {
                 };
                 return imgBlobs;
             }
+        }
+
+        export async function recentPlayed(data: { token?: string, page?: number }): Promise<string> {
+            const { token, page } = data;
+            try {
+                var response = await fetch(`https://donderhiroba.jp/history_recent_score.php?page=${page}`, {
+                    headers: createHeader(token ? `_token_v2=${token}` : undefined),
+                    redirect: 'manual'
+                });
+            }
+            catch (err) {
+                if (err instanceof Response) {
+                    throw new HirobaError('CANNOT_CONNECT', err);
+                }
+                else {
+                    throw new HirobaError('CANNOT_CONNECT');
+                }
+            }
+
+            const { logined, error } = checkCardLogin(response);
+            if (!logined) throw error;
+
+            return await response.text();
         }
     }
 
@@ -1306,6 +1329,109 @@ export namespace DonderHiroba {
                 return await detectDaniPass(img);
             }
         }
+
+        export function recentPlayed(html: string): RecentPlayed[] {
+            const dom = parseHTML(html);
+            const scoreUser = [...dom.querySelectorAll('.scoreUser')];
+            const recentPlayed: RecentPlayed[] = scoreUser.map((container) => {
+                let diff: Difficulty = "easy";
+                switch (container.querySelector('.levelIcon')?.getAttribute('src') ?? '') {
+                    case 'image/sp/640/icon_course02_2_640.png': {
+                        diff = "normal";
+                        break;
+                    }
+                    case 'image/sp/640/icon_course02_3_640.png': {
+                        diff = 'hard';
+                        break;
+                    }
+                    case 'image/sp/640/icon_course02_4_640.png': {
+                        diff = 'oni';
+                        break;
+                    }
+                    case 'image/sp/640/icon_course02_5_640.png': {
+                        diff = 'ura';
+                        break;
+                    }
+                };
+
+                let crown: Crown = null;
+                switch (container.querySelectorAll('.crownIcon')[0]?.getAttribute('src')) {
+                    case 'image/sp/640/crown_01_640.png': {
+                        crown = 'played';
+                        break;
+                    }
+                    case 'image/sp/640/crown_02_640.png': {
+                        crown = 'silver';
+                        break;
+                    }
+                    case 'image/sp/640/crown_03_640.png': {
+                        crown = 'gold';
+                        break;
+                    }
+                    case 'image/sp/640/crown_04_640.png': {
+                        crown = 'donderfull';
+                        break;
+                    }
+                }
+
+                let badge: Badge = null;
+                switch (container.querySelectorAll('.crownIcon')[1]?.getAttribute('src')) {
+                    case 'image/sp/640/best_score_rank_2_640.png': {
+                        badge = 'white';
+                        break;
+                    }
+                    case 'image/sp/640/best_score_rank_3_640.png': {
+                        badge = 'bronze';
+                        break;
+                    }
+                    case 'image/sp/640/best_score_rank_4_640.png': {
+                        badge = 'silver';
+                        break;
+                    }
+                    case 'image/sp/640/best_score_rank_5_640.png': {
+                        badge = 'gold';
+                        break;
+                    }
+                    case 'image/sp/640/best_score_rank_6_640.png': {
+                        badge = 'pink';
+                        break;
+                    }
+                    case 'image/sp/640/best_score_rank_7_640.png': {
+                        badge = 'purple';
+                        break;
+                    }
+                    case 'image/sp/640/best_score_rank_8_640.png': {
+                        badge = 'rainbow';
+                        break;
+                    }
+                }
+
+                const scoreElems = container.querySelectorAll('.playDataArea.scoreElement');
+
+                return {
+                    title: container.querySelector('.songNameTitleScore')?.textContent.trim() ?? '',
+                    diff,
+                    data: {
+                        crown,
+                        badge,
+                        score: parseInt(scoreElems[0]?.textContent ?? '0'),
+                        good: parseInt(scoreElems[1]?.textContent ?? '0'),
+                        ok: parseInt(scoreElems[3]?.textContent ?? '0'),
+                        bad: parseInt(scoreElems[5]?.textContent ?? '0'),
+                        maxCombo: parseInt(scoreElems[2]?.textContent ?? '0'),
+                        roll: parseInt(scoreElems[4]?.textContent ?? '0'),
+                        count: {
+                            play: parseInt(scoreElems[6]?.textContent ?? '0'),
+                            clear: parseInt(scoreElems[7]?.textContent ?? '0'),
+                            fullcombo: parseInt(scoreElems[8]?.textContent ?? '0'),
+                            donderfullcombo: parseInt(scoreElems[9]?.textContent ?? '0'),
+                        }
+                    }
+                }
+            });
+
+            return recentPlayed;
+        }
     }
 
     export namespace func {
@@ -1746,6 +1872,15 @@ export namespace DonderHiroba {
             return await DonderHiroba.parse.daniPass({
                 img: await DonderHiroba.request.daniPlate(data)
             });
+        }
+
+        /**
+         * 최근 플레이한 기록을 가져옵니다.
+         */
+        export async function getRecentPlayed(data: { token?: string, page: number }): Promise<RecentPlayed[]> {
+            return DonderHiroba.parse.recentPlayed(
+                await DonderHiroba.request.recentPlayed(data)
+            )
         }
 
         /**

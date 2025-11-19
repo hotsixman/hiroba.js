@@ -39,6 +39,8 @@ A `DonderHiroba` instance holds the state of a logged-in user, including their s
 
 - **`ticket: string | null`**: A string value that is required for certain actions, such as changing the nickname. It is `null` if no ticket has been fetched.
 
+- **`recentPlayed: RecentPlayed[]`**: An array of `RecentPlayed` objects, representing the user's recently played songs.
+
 ### Methods
 
 - **`constructor(token?: string)`**: Creates a new `DonderHiroba` instance.
@@ -72,6 +74,8 @@ A `DonderHiroba` instance holds the state of a logged-in user, including their s
 
 - **`getTicket(): Promise<string | null>`**: Fetches a ticket value required for certain actions.
   - **Returns**: A `Promise` that resolves with the ticket value, or `null` if the ticket could not be fetched.
+
+- **`updateRecentPlayed(): Promise<void>`**: Updates the recently played songs data.
 
 ## Static Properties & Methods
 
@@ -107,6 +111,7 @@ The `DonderHiroba.func` namespace is an object containing high-level functions t
     - **`updateRecord(data: { token?: string }): Promise<void>`**: Refreshes the song score data.
     - **`changeName(data: { token?: string, ticket: string, newName: string }): Promise<void>`**: Changes the nickname.
     - **`getTicket(data?: { token?: string }): Promise<string | null>`**: Fetches the `ticket` value required for changing the nickname.
+    - **`getRecentPlayed(data?: { token?: string }): Promise<RecentPlayed[]>`**: Fetches the recently played songs.
     - **`getDaniPass(data: { token?: string, dan?: DaniNo }): Promise<DaniPassData | Record<DaniNo, DaniPassData>>`**: Fetches and parses the Dan-i Pass images.
       - **`data`** (object):
         - **`token`** (`string`, optional): The session token.
@@ -131,6 +136,7 @@ The `DonderHiroba.request` namespace is an object containing functions that send
         - **`dan`** (`DaniNo`, optional): The specific Dan-i number to fetch the image for. If omitted, all available Dan-i Pass images will be fetched.
       - **Returns**: A `Promise` that resolves with a `Blob` if a specific `dan` is provided, or an array of `Blob`s if `dan` is omitted.
     - **`ticket(data?: { token?: string }): Promise<string>`**: Fetches the HTML of the My Page.
+    - **`recentPlayed(data?: { token?: string }): Promise<string>`**: Fetches the HTML of the recently played songs page.
 
 ### `DonderHiroba.parse`
 
@@ -149,3 +155,4 @@ The `DonderHiroba.parse` namespace is an object containing functions that parse 
         - **`img`** (`Blob | Blob[]`): The image data (Blob) or an array of image data (Blobs) to parse.
       - **Returns**: A `Promise` that resolves with `DaniPassData` if a single `Blob` is provided, or a `Record<DaniNo, DaniPassData>` if an array of `Blob`s is provided. `DaniPassData` contains `pass` (gold or red) and `edge` (silver, gold, or donderfull).
     - **`ticket(html: string): string | null`**: Parses the `ticket` value from the My Page HTML.
+    - **`recentPlayed(html: string): RecentPlayed[]`**: Parses the recently played songs HTML and returns an array of `RecentPlayed` objects.

@@ -1,6 +1,6 @@
 {
   "name": "hiroba-js",
-  "version": "2.2.1",
+  "version": "2.3.0",
   "description": "Donderhiroba for js.",
   "main": "./cjs/index.js",
   "module": "./esm/index.js",

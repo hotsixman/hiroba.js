@@ -30,3 +30,19 @@ export interface Count {
     fullcombo: number
     donderfullcombo: number
 }
+
+export interface RecentPlayed {
+    title: string;
+    diff: Difficulty;
+    data: {
+        crown: Crown;
+        badge: Badge;
+        score: number;
+        good: number;
+        ok: number;
+        bad: number;
+        maxCombo: number;
+        roll: number;
+        count: Count;
+    }
+}
