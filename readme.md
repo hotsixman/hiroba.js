@@ -75,8 +75,6 @@ A `DonderHiroba` instance holds the state of a logged-in user, including their s
 - **`getTicket(): Promise<string | null>`**: Fetches a ticket value required for certain actions.
   - **Returns**: A `Promise` that resolves with the ticket value, or `null` if the ticket could not be fetched.
 
-- **`updateRecentPlayed(): Promise<void>`**: Updates the recently played songs data.
-
 ## Static Properties & Methods
 
 The `DonderHiroba` class provides several static namespaces and methods that can be called directly without creating an instance. These static members are primarily used for fetching HTML from specific pages (`request`), parsing that HTML (`parse`), or combining multiple requests and parsing steps to perform a specific function (`func`).
