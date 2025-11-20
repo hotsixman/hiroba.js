@@ -515,12 +515,12 @@ export namespace DonderHiroba {
             return await response.text();
         }
 
-        export async function daniPlate(data: { token?: string }): Promise<Blob[]>;
-        export async function daniPlate(data: { token?: string, dan: DaniNo }): Promise<Blob>;
-        export async function daniPlate({ token, dan }: { token?: string, dan?: DaniNo }): Promise<Blob | Blob[]> {
+        export async function daniPlate(data: { token?: string, taikoNo: string; }): Promise<Blob[]>;
+        export async function daniPlate(data: { token?: string, dan: DaniNo, taikoNo: string; }): Promise<Blob>;
+        export async function daniPlate({ token, dan, taikoNo }: { token?: string, dan?: DaniNo, taikoNo: string; }): Promise<Blob | Blob[]> {
             if (dan) {
                 try {
-                    var response = await fetch(`https://donderhiroba.jp/imgsrc_dani.php?taiko_no=353820166716&dan=${dan}&img=0`, {
+                    var response = await fetch(`https://donderhiroba.jp/imgsrc_dani.php?taiko_no=${taikoNo}&dan=${dan}&img=0`, {
                         headers: createHeader(token ? `_token_v2=${token}` : undefined),
                         redirect: 'manual'
                     });
@@ -543,7 +543,7 @@ export namespace DonderHiroba {
                 const imgBlobs: Blob[] = [];
                 for (let i = 1; i <= 19; i++) {
                     try {
-                        var response = await fetch(`https://donderhiroba.jp/imgsrc_dani.php?taiko_no=353820166716&dan=${i}&img=0`, {
+                        var response = await fetch(`https://donderhiroba.jp/imgsrc_dani.php?taiko_no=${taikoNo}&dan=${i}&img=0`, {
                             headers: createHeader(token ? `_token_v2=${token}` : undefined),
                             redirect: 'manual'
                         });
@@ -1866,9 +1866,9 @@ export namespace DonderHiroba {
             }
         }
 
-        export async function getDaniPass(data: { token?: string }): Promise<Record<DaniNo, DaniPassData>>;
-        export async function getDaniPass(data: { token?: string, dan: DaniNo }): Promise<DaniPassData>;
-        export async function getDaniPass(data: { token?: string, dan?: DaniNo }): Promise<DaniPassData | Record<DaniNo, DaniPassData>> {
+        export async function getDaniPass(data: { token?: string; taikoNo: string; }): Promise<Record<DaniNo, DaniPassData>>;
+        export async function getDaniPass(data: { token?: string, dan: DaniNo; taikoNo: string; }): Promise<DaniPassData>;
+        export async function getDaniPass(data: { token?: string, dan?: DaniNo; taikoNo: string; }): Promise<DaniPassData | Record<DaniNo, DaniPassData>> {
             return await DonderHiroba.parse.daniPass({
                 img: await DonderHiroba.request.daniPlate(data)
             });
