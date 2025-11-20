@@ -1361,11 +1361,11 @@ export namespace DonderHiroba {
                         break;
                     }
                     case 'image/sp/640/crown_02_640.png': {
-                        crown = 'silver';
+                        crown = 'gold';
                         break;
                     }
                     case 'image/sp/640/crown_03_640.png': {
-                        crown = 'gold';
+                        crown = 'silver';
                         break;
                     }
                     case 'image/sp/640/crown_04_640.png': {
