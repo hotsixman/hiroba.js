@@ -253,14 +253,39 @@ export namespace DonderHiroba {
             }
         };
 
-        export async function clearData(data?: { token?: string }): Promise<string[]>;
-        export async function clearData(data?: { token?: string, genre: keyof typeof Const.genre }): Promise<string>;
-        export async function clearData(data?: { token?: string, genre?: keyof typeof Const.genre }) {
+        export async function clearData(data?: { token?: string, taikoNo?: string; }): Promise<string[]>;
+        export async function clearData(data?: { token?: string, genre: keyof typeof Const.genre, taikoNo?: string; }): Promise<string>;
+        export async function clearData(data?: { token?: string, genre?: keyof typeof Const.genre, taikoNo?: string; }) {
             const genre = data?.genre ?? undefined;
             const token = data?.token ?? undefined;
+            const taikoNo = data?.taikoNo;
+
             if (genre) {
+                const response = await fetchSpeceficGenrePage(Const.genre[genre]);
+
+                const { logined, error } = checkCardLogin(response);
+                if (!logined) throw error;
+
+                return await response.text();
+            }
+            else {
+                const genres = [1, 2, 3, 4, 5, 6, 7, 8];
+                const datas: string[] = [];
+                for (const genre of genres) {
+                    const response = await fetchSpeceficGenrePage(genre);
+
+                    const { logined, error } = checkCardLogin(response);
+                    if (!logined) throw error;
+
+                    datas.push(await response.text());
+                };
+
+                return datas;
+            }
+
+            async function fetchSpeceficGenrePage(genre: number) {
                 try {
-                    var response = await fetch(`https://donderhiroba.jp/score_list.php?genre=${Const.genre[genre]}`, {
+                    var response = await fetch(getPageUrl(genre), {
                         headers: createHeader(token ? `_token_v2=${token}` : undefined),
                         redirect: 'manual'
                     })
@@ -274,37 +299,16 @@ export namespace DonderHiroba {
                     }
                 }
 
-                const { logined, error } = checkCardLogin(response);
-                if (!logined) throw error;
-
-                return await response.text();
+                return response;
             }
-            else {
-                const genres = [1, 2, 3, 4, 5, 6, 7, 8];
-                const datas: string[] = [];
-                for (const genre of genres) {
-                    try {
-                        var response = await fetch(`https://donderhiroba.jp/score_list.php?genre=${genre}`, {
-                            headers: createHeader(token ? `_token_v2=${token}` : undefined),
-                            redirect: 'manual'
-                        })
-                    }
-                    catch (err) {
-                        if (err instanceof Response) {
-                            throw new HirobaError('CANNOT_CONNECT', err);
-                        }
-                        else {
-                            throw new HirobaError('CANNOT_CONNECT');
-                        }
-                    }
 
-                    const { logined, error } = checkCardLogin(response);
-                    if (!logined) throw error;
-
-                    datas.push(await response.text());
-                };
-
-                return datas;
+            function getPageUrl(genre: number) {
+                if (taikoNo) {
+                    return `https://donderhiroba.jp/score_list.php?genre=${genre}&taiko_no=${taikoNo}`
+                }
+                else {
+                    return `https://donderhiroba.jp/score_list.php?genre=${genre}`
+                }
             }
         };
 
@@ -442,17 +446,17 @@ export namespace DonderHiroba {
             }
         }
 
-        export async function scoreData(data: { token?: string, songNo: string, difficulty?: undefined }): Promise<string[]>;
-        export async function scoreData(data: { token?: string, songNo: string, difficulty: Difficulty }): Promise<string>;
-        export async function scoreData(data: { token?: string, songNo: string, difficulty?: Difficulty }) {
-            const { token, songNo, difficulty } = data;
+        export async function scoreData(data: { token?: string, songNo: string, difficulty?: undefined, taikoNo?: string; }): Promise<string[]>;
+        export async function scoreData(data: { token?: string, songNo: string, difficulty: Difficulty, taikoNo?: string; }): Promise<string>;
+        export async function scoreData(data: { token?: string, songNo: string, difficulty?: Difficulty, taikoNo?: string; }) {
+            const { token, songNo, difficulty, taikoNo } = data;
             if (difficulty) {
-                return await requestScoreDataByDiff({ token, songNo, difficulty });
+                return await requestScoreDataByDiff({ token, songNo, difficulty, taikoNo });
             }
             else {
                 const htmls: string[] = [];
                 for (const difficulty of ['easy', 'normal', 'hard', 'oni', 'ura'] as Difficulty[]) {
-                    htmls.push(await requestScoreDataByDiff({ token, songNo, difficulty }));
+                    htmls.push(await requestScoreDataByDiff({ token, songNo, difficulty, taikoNo }));
                 }
                 return htmls;
             }
@@ -468,9 +472,16 @@ export namespace DonderHiroba {
                 return m[difficulty];
             }
 
-            async function requestScoreDataByDiff({ songNo, difficulty, token }: { songNo: string, difficulty: Difficulty, token?: string }) {
+            async function requestScoreDataByDiff({ songNo, difficulty, token, taikoNo }: { songNo: string, difficulty: Difficulty, token?: string, taikoNo?: string }) {
+                let url: URL = new URL("https://donderhiroba.jp/score_detail.php");
+                url.searchParams.set("song_no", songNo);
+                url.searchParams.set("level", getDifficultyNumber(difficulty).toString());
+                if(taikoNo){
+                    url.searchParams.set("taiko_no", taikoNo);
+                }
+                
                 try {
-                    var response = await fetch(`https://donderhiroba.jp/score_detail.php?song_no=${songNo}&level=${getDifficultyNumber(difficulty)}`, {
+                    var response = await fetch(url, {
                         headers: createHeader(token ? `_token_v2=${token}` : undefined),
                         redirect: 'manual'
                     });
@@ -588,6 +599,65 @@ export namespace DonderHiroba {
 
             return await response.text();
         }
+
+        export async function othersClearData(data?: { token?: string, taikoNo?: string }): Promise<string[]>;
+        export async function othersClearData(data?: { token?: string, genre: keyof typeof Const.genre, taikoNo?: string }): Promise<string>;
+        export async function othersClearData(data?: { token?: string, genre?: keyof typeof Const.genre, taikoNo?: string }) {
+            const genre = data?.genre ?? undefined;
+            const token = data?.token ?? undefined;
+            const taikoNo = data?.taikoNo;
+
+            if (genre) {
+                const response = await fetchSpeceficGenrePage(Const.genre[genre]);
+
+                const { logined, error } = checkCardLogin(response);
+                if (!logined) throw error;
+
+                return await response.text();
+            }
+            else {
+                const genres = [1, 2, 3, 4, 5, 6, 7, 8];
+                const datas: string[] = [];
+                for (const genre of genres) {
+                    const response = await fetchSpeceficGenrePage(genre);
+
+                    const { logined, error } = checkCardLogin(response);
+                    if (!logined) throw error;
+
+                    datas.push(await response.text());
+                };
+
+                return datas;
+            }
+
+            async function fetchSpeceficGenrePage(genre: number) {
+                try {
+                    var response = await fetch(getPageUrl(genre), {
+                        headers: createHeader(token ? `_token_v2=${token}` : undefined),
+                        redirect: 'manual'
+                    })
+                }
+                catch (err) {
+                    if (err instanceof Response) {
+                        throw new HirobaError('CANNOT_CONNECT', err);
+                    }
+                    else {
+                        throw new HirobaError('CANNOT_CONNECT');
+                    }
+                }
+
+                return response;
+            }
+
+            function getPageUrl(genre: number) {
+                if (taikoNo) {
+                    return `https://donderhiroba.jp/score_list.php?genre=${genre}&taiko_no=${taikoNo}`
+                }
+                else {
+                    return `https://donderhiroba.jp/score_list.php?genre=${genre}`
+                }
+            }
+        };
     }
 
     export namespace parse {
@@ -1649,7 +1719,7 @@ export namespace DonderHiroba {
         /**
          * 클리어 데이터를 가져옵니다.
          */
-        export async function getClearData(data?: { token?: string, genre?: keyof typeof Const.genre }) {
+        export async function getClearData(data?: { token?: string, genre?: keyof typeof Const.genre, taikoNo?: string }) {
             return parse.clearData(await request.clearData(data));
         }
 
@@ -1723,9 +1793,9 @@ export namespace DonderHiroba {
          * @param data 
          * @returns 
          */
-        export async function getScoreData(data: { token?: string, songNo: string, difficulty?: Difficulty }) {
-            const { token, songNo, difficulty } = data;
-            return parse.scoreData({ html: await request.scoreData({ token, songNo, difficulty: (difficulty as any) }), songNo });
+        export async function getScoreData(data: { token?: string, songNo: string, difficulty?: Difficulty, taikoNo?: string }) {
+            const { token, songNo, difficulty, taikoNo } = data;
+            return parse.scoreData({ html: await request.scoreData({ token, songNo, difficulty: (difficulty as any), taikoNo }), songNo });
         }
 
         /**
