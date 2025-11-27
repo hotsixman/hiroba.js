@@ -476,10 +476,10 @@ export namespace DonderHiroba {
                 let url: URL = new URL("https://donderhiroba.jp/score_detail.php");
                 url.searchParams.set("song_no", songNo);
                 url.searchParams.set("level", getDifficultyNumber(difficulty).toString());
-                if(taikoNo){
+                if (taikoNo) {
                     url.searchParams.set("taiko_no", taikoNo);
                 }
-                
+
                 try {
                     var response = await fetch(url, {
                         headers: createHeader(token ? `_token_v2=${token}` : undefined),
@@ -600,64 +600,38 @@ export namespace DonderHiroba {
             return await response.text();
         }
 
-        export async function othersClearData(data?: { token?: string, taikoNo?: string }): Promise<string[]>;
-        export async function othersClearData(data?: { token?: string, genre: keyof typeof Const.genre, taikoNo?: string }): Promise<string>;
-        export async function othersClearData(data?: { token?: string, genre?: keyof typeof Const.genre, taikoNo?: string }) {
-            const genre = data?.genre ?? undefined;
-            const token = data?.token ?? undefined;
-            const taikoNo = data?.taikoNo;
+        export async function card(data: { token?: string, taikoNo: string }): Promise<string> {
+            const { token, taikoNo } = data;
+            const url = new URL('https://donderhiroba.jp/user_profile.php');
+            url.searchParams.set('taiko_no', taikoNo);
 
-            if (genre) {
-                const response = await fetchSpeceficGenrePage(Const.genre[genre]);
-
-                const { logined, error } = checkCardLogin(response);
-                if (!logined) throw error;
-
-                return await response.text();
+            try {
+                var response = await fetch(url, {
+                    headers: createHeader(token ? `_token_v2=${token}` : undefined),
+                    redirect: 'manual'
+                });
             }
-            else {
-                const genres = [1, 2, 3, 4, 5, 6, 7, 8];
-                const datas: string[] = [];
-                for (const genre of genres) {
-                    const response = await fetchSpeceficGenrePage(genre);
-
-                    const { logined, error } = checkCardLogin(response);
-                    if (!logined) throw error;
-
-                    datas.push(await response.text());
-                };
-
-                return datas;
-            }
-
-            async function fetchSpeceficGenrePage(genre: number) {
-                try {
-                    var response = await fetch(getPageUrl(genre), {
-                        headers: createHeader(token ? `_token_v2=${token}` : undefined),
-                        redirect: 'manual'
-                    })
-                }
-                catch (err) {
-                    if (err instanceof Response) {
-                        throw new HirobaError('CANNOT_CONNECT', err);
-                    }
-                    else {
-                        throw new HirobaError('CANNOT_CONNECT');
-                    }
-                }
-
-                return response;
-            }
-
-            function getPageUrl(genre: number) {
-                if (taikoNo) {
-                    return `https://donderhiroba.jp/score_list.php?genre=${genre}&taiko_no=${taikoNo}`
+            catch (err) {
+                if (err instanceof Response) {
+                    throw new HirobaError('CANNOT_CONNECT', err);
                 }
                 else {
-                    return `https://donderhiroba.jp/score_list.php?genre=${genre}`
+                    throw new HirobaError('CANNOT_CONNECT');
                 }
             }
-        };
+
+            const { logined, error } = checkNamcoLogin(response);
+            if (!logined) throw error;
+
+            const html = await response.text();
+            //return html;
+            if (isBrowser()) {
+                return html;
+            }
+            else {
+                return sanitizeHTML(html);
+            }
+        }
     }
 
     export namespace parse {
@@ -1031,7 +1005,7 @@ export namespace DonderHiroba {
                 crown: {
                     donderfull: Number(totalScore.querySelector('.donderful_crown_count')?.textContent ?? '0'),
                     gold: Number(totalScore.querySelector('.gold_crown_count')?.textContent ?? '0'),
-                    silver: Number(totalScore.querySelector('.silver_crown_count')?.textContent ?? '0')
+                    silver: Number(totalScore.querySelector('.silver_crown_count')?.textContent ?? totalScore.querySelector('.silver_crown_coun')?.textContent ?? '0')
                 },
                 badge: {
                     rainbow: Number(totalScore.querySelector('.best_rank_score_8')?.textContent ?? '0'),
@@ -1950,6 +1924,12 @@ export namespace DonderHiroba {
         export async function getRecentPlayed(data: { token?: string, page: number }): Promise<RecentPlayed[]> {
             return DonderHiroba.parse.recentPlayed(
                 await DonderHiroba.request.recentPlayed(data)
+            )
+        }
+
+        export async function getCardData(data: { token?: string, taikoNo: string }): Promise<CardData & { summary?: Summary } | null> {
+            return DonderHiroba.parse.currentLogin(
+                await DonderHiroba.request.card(data)
             )
         }
 
