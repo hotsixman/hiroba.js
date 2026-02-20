@@ -914,8 +914,8 @@ export namespace DonderHiroba {
                     totalScore: 0
                 };
 
-                const totalScoreText = el.querySelector('.player-info div')?.textContent?.trim()?.split('\n')?.[1]?.trim()?.replace('点', '');
-                if (totalScoreText && totalScoreText !== "スコア未登録") {
+                const totalScoreText = el.querySelector('.player-info div')?.textContent?.replace(/\D/g, "")
+                if (totalScoreText) {
                     rankingData.totalScore = Number(totalScoreText);
                 };
 
