@@ -1501,7 +1501,7 @@ export namespace DonderHiroba {
                     shortcut: 0,
                     retention: 0,
                     language: 'ko',
-                    cookie: '{"language":"ko"}',
+                    cookie: `{"language":"ko", "passkeyInfoProd":"d5badc8a-30a3-4477-bca1-9c6a589376f5"}`,
                     prompt: 'login',
                 };
 
@@ -1542,13 +1542,19 @@ export namespace DonderHiroba {
                     throw new HirobaError("INVALID_ID_PASSWORD");
                 }
 
+                let redirectUri = new URL(data.redirect);
+                if(redirectUri.pathname.includes('passkeyInfo.html')){
+                    redirectUri = new URL(redirectUri.searchParams.get('redirect_uri') as string);
+                }
+
                 let cookieString = '';
                 const cookies = setCookieParser(response.headers.getSetCookie())
                 for (const cookie of cookies) {
                     if (cookie.domain === '.bandainamcoid.com' && cookie.value !== undefined) {
                         cookieString += cookie.name + '=' + cookie.value + ';';
                     }
-                } response = await fetch(data.redirect, {
+                }
+                response = await fetch(data.redirect, {
                     headers: createHeader(cookieString),
                     redirect: 'manual'
                 });
@@ -1580,6 +1586,7 @@ export namespace DonderHiroba {
                 }
             }
             catch (err) {
+                console.log(err);
                 if (err instanceof Response) {
                     throw new HirobaError('CANNOT_CONNECT', err);
                 }
