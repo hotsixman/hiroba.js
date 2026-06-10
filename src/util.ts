@@ -43,7 +43,7 @@ export class HirobaError extends Error {
     }
 }
 
-export type HirobaErrorCode = 'NOT_LOGINED' | 'NOT_NAMCO_LOGINED' | 'CANNOT_CONNECT' | 'INVALID_ID_PASSWORD' | 'NO_MATCHED_CARD' | 'UNKNOWN_ERROR';
+export type HirobaErrorCode = 'NOT_LOGINED' | 'NOT_NAMCO_LOGINED' | 'CANNOT_CONNECT' | 'INVALID_ID_PASSWORD' | 'NO_MATCHED_CARD' | 'UNKNOWN_ERROR' | 'NO_TICKET';
 
 /**
  * 반다이 남코 아이디로 로그인 되어 있는 지 체크합니다.
