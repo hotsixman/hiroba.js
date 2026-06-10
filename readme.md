@@ -57,11 +57,11 @@ A `DonderHiroba` instance holds the state of a logged-in user, including their s
 - **`cardLogin(taikoNumber: string): Promise<void>`**: Logs into a specific Taiko card.
   - **`taikoNumber`** (`string`): The Taiko number of the card to log in with.
 
-- **`updateClearData(genre?: keyof typeof Const.genre): Promise<Record<string, ClearData>>`**: Updates the clear data for a specific genre and returns the updated data.
+- **`syncClearData(genre?: keyof typeof Const.genre): Promise<Record<string, ClearData>>`**: Updates the clear data for a specific genre and returns the updated data.
   - **`genre`** (`keyof typeof Const.genre`, optional): The genre to update the clear data for. If not provided, all genres will be updated.
   - **Returns**: A `Promise` that resolves with a `Record` object containing the updated clear data, with the song number as the key.
 
-- **`updateScoreData(songNo: string, difficulty?: Difficulty): Promise<ScoreData | null>`**: Updates the score data for a specific song and difficulty and returns the updated data.
+- **`syncScoreData(songNo: string, difficulty?: Difficulty): Promise<ScoreData | null>`**: Updates the score data for a specific song and difficulty and returns the updated data.
   - **`songNo`** (`string`): The song number to update the score data for.
   - **`difficulty`** (`Difficulty`, optional): The difficulty to update the score data for. If not provided, all difficulties will be updated.
   - **Returns**: A `Promise` that resolves with the updated `ScoreData` object, or `null` if the song was not found.
@@ -72,8 +72,12 @@ A `DonderHiroba` instance holds the state of a logged-in user, including their s
   - **`newName`** (`string`): The new nickname.
   - **Returns**: A `Promise` that resolves with the updated `CardData` object, or `null` if the nickname change failed.
 
-- **`getTicket(): Promise<string | null>`**: Fetches a ticket value required for certain actions.
-  - **Returns**: A `Promise` that resolves with the ticket value, or `null` if the ticket could not be fetched.
+- **`changeKisekae(kisekae: KisekaeReqData): Promise<void>`**: Changes the user's costume (Kisekae).
+  - **`kisekae`** (`KisekaeReqData`): An object containing the new costume data.
+
+- **`setToken(token: string): void`**: Sets the session token.
+
+- **`getToken(): string | undefined`**: Returns the session token.
 
 ## Static Properties & Methods
 

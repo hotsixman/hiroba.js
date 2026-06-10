@@ -27,7 +27,7 @@ npm install hiroba-js
 
 - **`cardLogined: boolean`**: 사용자가 특정 태고 카드에 로그인했는지 여부를 나타내는 부울 값입니다. 카드 로그인 성공 시 `true`로 설정됩니다.
 
-- **`currentLogin: CardData | null`**: 현재 로그인된 카드의 데이터를 포함하는 객체입니다. 로그인된 카드가 없으면 `null`입니다.
+- **`currentLogin: (CardData & {summary?: Summary}) | null`**: 현재 로그인된 카드의 데이터를 포함하는 객체입니다. 로그인된 카드가 없으면 `null`입니다.
 
 - **`cardList: CardData[]`**: 사용자의 태고 카드를 나타내는 `CardData` 객체의 배열입니다.
 
@@ -36,6 +36,8 @@ npm install hiroba-js
 - **`scoreData: Map<string, ScoreData>`**: 각 곡의 점수 데이터를 저장하는 `Map` 객체입니다. 키는 곡 번호(`string`)이고 값은 `ScoreData` 객체입니다.
 
 - **`ticket: string | null`**: 닉네임 변경과 같은 특정 작업에 필요한 문자열 값입니다. 가져온 티켓이 없으면 `null`입니다.
+
+- **`recentPlayed: RecentPlayed[]`**: 최근 플레이한 곡들의 정보를 담고 있는 `RecentPlayed` 객체의 배열입니다.
 
 ### 메서드
 
@@ -53,11 +55,11 @@ npm install hiroba-js
 - **`cardLogin(taikoNumber: string): Promise<void>`**: 특정 태고 카드에 로그인합니다.
   - **`taikoNumber`** (`string`): 로그인할 카드의 태고 번호입니다.
 
-- **`updateClearData(genre?: keyof typeof Const.genre): Promise<Record<string, ClearData>>`**: 특정 장르의 클리어 데이터를 업데이트하고 업데이트된 데이터를 반환합니다.
+- **`syncClearData(genre?: keyof typeof Const.genre): Promise<Record<string, ClearData>>`**: 특정 장르의 클리어 데이터를 업데이트하고 업데이트된 데이터를 반환합니다.
   - **`genre`** (`keyof typeof Const.genre`, optional): 클리어 데이터를 업데이트할 장르입니다. 제공되지 않으면 모든 장르가 업데이트됩니다.
   - **반환값**: 곡 번호를 키로 사용하여 업데이트된 클리어 데이터를 포함하는 `Record` 객체로 확인되는 `Promise`를 반환합니다.
 
-- **`updateScoreData(songNo: string, difficulty?: Difficulty): Promise<ScoreData | null>`**: 특정 곡 및 난이도의 점수 데이터를 업데이트하고 업데이트된 데이터를 반환합니다.
+- **`syncScoreData(songNo: string, difficulty?: Difficulty): Promise<ScoreData | null>`**: 특정 곡 및 난이도의 점수 데이터를 업데이트하고 업데이트된 데이터를 반환합니다.
   - **`songNo`** (`string`): 점수 데이터를 업데이트할 곡 번호입니다.
   - **`difficulty`** (`Difficulty`, optional): 점수 데이터를 업데이트할 난이도입니다. 제공되지 않으면 모든 난이도가 업데이트됩니다.
   - **반환값**: 업데이트된 `ScoreData` 객체로 확인되는 `Promise`를 반환하거나 곡을 찾을 수 없는 경우 `null`을 반환합니다.
@@ -68,8 +70,12 @@ npm install hiroba-js
   - **`newName`** (`string`): 새 닉네임입니다.
   - **반환값**: 업데이트된 `CardData` 객체로 확인되는 `Promise`를 반환하거나 닉네임 변경에 실패한 경우 `null`을 반환합니다.
 
-- **`getTicket(): Promise<string | null>`**: 특정 작업에 필요한 티켓 값을 가져옵니다.
-  - **반환값**: 티켓 값으로 확인되는 `Promise`를 반환하거나 티켓을 가져올 수 없는 경우 `null`을 반환합니다.
+- **`changeKisekae(kisekae: KisekaeReqData): Promise<void>`**: 사용자의 코스튬(Kisekae)을 변경합니다.
+  - **`kisekae`** (`KisekaeReqData`): 새로운 코스튬 데이터를 담고 있는 객체입니다.
+
+- **`setToken(token: string): void`**: 세션 토큰을 설정합니다.
+
+- **`getToken(): string | undefined`**: 세션 토큰을 반환합니다.
 
 ## 정적 속성 및 메서드
 
@@ -101,10 +107,17 @@ npm install hiroba-js
     - **`getCompeDetail(data: { token?: string, compeId: string }): Promise<CompeDetail | null>`**: 대회의 세부 정보를 가져옵니다.
     - **`getCompeRanking(data: { token?: string, compeId: string }): Promise<RankingData[] | null>`**: 대회의 순위 데이터를 가져옵니다.
     - **`getCompeData(data: { token?: string, compeId: string }): Promise<CompeData | null>`**: 대회의 세부 정보와 순위 데이터를 모두 가져옵니다.
-    - **`getCurrentLogin(data?: { token?: string }): Promise<CardData | null>`**: 현재 로그인된 카드의 데이터를 가져옵니다.
+    - **`getCurrentLogin(data?: { token?: string }): Promise<(CardData & {summary?: Summary}) | null>`**: 현재 로그인된 카드의 데이터를 가져옵니다.
     - **`updateRecord(data: { token?: string }): Promise<void>`**: 곡 점수 데이터를 새로 고칩니다.
     - **`changeName(data: { token?: string, ticket: string, newName: string }): Promise<void>`**: 닉네임을 변경합니다.
     - **`getTicket(data?: { token?: string }): Promise<string | null>`**: 닉네임 변경에 필요한 `ticket` 값을 가져옵니다.
+    - **`getRecentPlayed(data: { token?: string, page: number }): Promise<RecentPlayed[]>`**: 최근 플레이한 곡 정보를 가져옵니다.
+    - **`getDaniPass(data: { token?: string, dan?: DaniNo }): Promise<DaniPassData | Record<DaniNo, DaniPassData>>`**: 단의 도장 합격 이미지를 가져와 파싱합니다.
+      - **`data`** (object):
+        - **`token`** (`string`, optional): 세션 토큰입니다.
+        - **`dan`** (`DaniNo`, optional): 가져올 특정 단 번호입니다. 생략하면 모든 가능한 합격 이미지를 가져옵니다. (1은 5급, 19는 달인)
+      - **반환값**: 특정 `dan`이 제공되면 `DaniPassData`로, 생략되면 `Record<DaniNo, DaniPassData>`로 확인되는 `Promise`를 반환합니다.
+    - **`changeKisekae(data: { token?: string, kisekae: KisekaeReqData }): Promise<void>`**: 코스튬을 변경합니다.
 
 ### `DonderHiroba.request`
 
@@ -115,10 +128,19 @@ npm install hiroba-js
     - **`clearData(data?: { token?: string, genre?: keyof typeof Const.genre }): Promise<string | string[]>`**: 클리어 데이터 페이지의 HTML을 가져옵니다.
     - **`scoreData(data: { token?: string, songNo: string, difficulty?: Difficulty }): Promise<string | string[]>`**: 점수 데이터 페이지의 HTML을 가져옵니다.
     - **`daniData(data?: { token?: string, daniNo?: number }): Promise<string | string[]>`**: 단의 도장 데이터 페이지의 HTML을 가져옵니다.
-    - **`compeDetail(data: { token?: string, compeId: string }): Promise<string>`**: 대회 세부 정보 페이지의 HTML을 가져옵니다.
+    - ****`compeDetail(data: { token?: string, compeId: string }): Promise<string>`**: 대회 세부 정보 페이지의 HTML을 가져옵니다.
     - **`compeRanking(data: { token?: string, compeId: string }): Promise<string>`**: 대회 순위 페이지의 HTML을 가져옵니다.
     - **`currentLogin(data?: { token?: string }): Promise<string>`**: 현재 로그인된 카드 정보를 얻기 위해 메인 페이지의 HTML을 가져옵니다.
+    - **`daniPlate(data: { token?: string, dan?: DaniNo }): Promise<Blob | Blob[]>`**: 단의 도장 합격 이미지를 Blob으로 가져옵니다.
+      - **`data`** (object):
+        - **`token`** (`string`, optional): 세션 토큰입니다.
+        - **`dan`** (`DaniNo`, optional): 이미지를 가져올 특정 단 번호입니다. 생략하면 모든 가능한 합격 이미지를 가져옵니다.
+      - **반환값**: 특정 `dan`이 제공되면 `Blob`으로, 생략되면 `Blob` 배열로 확인되는 `Promise`를 반환합니다.
     - **`ticket(data?: { token?: string }): Promise<string>`**: 마이페이지의 HTML을 가져옵니다.
+    - **`recentPlayed(data: { token?: string, page?: number }): Promise<string>`**: 최근 플레이한 곡 페이지의 HTML을 가져옵니다.
+    - **`kisekaeTicket(data: { token?: string }): Promise<string>`**: 코스튬 변경 페이지의 HTML을 가져옵니다.
+    - **`kisekaeCheckIP(data: { token?: string, kisekae: KisekaeReqData, ticket: string }): Promise<void>`**: 코스튬 변경 전 IP 체크를 수행합니다.
+    - **`kisekaeChange(data: { token?: string, kisekae: KisekaeReqData, ticket: string }): Promise<void>`**: 실제로 코스튬을 변경하는 요청을 보냅니다.
 
 ### `DonderHiroba.parse`
 
@@ -131,5 +153,10 @@ npm install hiroba-js
     - **`daniData(data: { html: string, daniNo: number } | { html: string, daniNo: number }[]): DaniData | DaniData[] | null`**: 단의 도장 데이터 HTML을 파싱하고 `DaniData` 객체 또는 객체 배열을 반환합니다.
     - **`compeDetail(html: string): CompeDetail | null`**: 대회 세부 정보 HTML을 파싱하고 `CompeDetail` 객체를 반환합니다.
     - **`compeRanking(html: string): RankingData[] | null`**: 대회 순위 HTML을 파싱하고 `RankingData` 객체 배열을 반환합니다.
-    - **`currentLogin(html: string): CardData | null`**: 메인 페이지 HTML을 파싱하고 현재 로그인된 `CardData` 객체를 반환합니다.
+    - **`currentLogin(html: string): (CardData & {summary?: Summary}) | null`**: 메인 페이지 HTML을 파싱하고 현재 로그인된 `CardData` 객체를 반환합니다.
+    - **`daniPass(data: { img: Blob | Blob[] }): Promise<DaniPassData | Record<DaniNo, DaniPassData>>`**: 단의 도장 합격 이미지(Blob)를 파싱하여 합격 종류와 테두리 종류를 추출합니다.
+      - **`data`** (object):
+        - **`img`** (`Blob | Blob[]`): 파싱할 이미지 데이터(Blob) 또는 이미지 데이터 배열(Blob[])입니다.
+      - **반환값**: 단일 `Blob`이 제공되면 `DaniPassData`로, `Blob` 배열이 제공되면 `Record<DaniNo, DaniPassData>`로 확인되는 `Promise`를 반환합니다. `DaniPassData`에는 `pass`(금합격 또는 적합격) 및 `edge`(은테, 금테 또는 무지개테) 정보가 포함됩니다.
     - **`ticket(html: string): string | null`**: 마이페이지 HTML에서 `ticket` 값을 파싱합니다.
+    - **`recentPlayed(html: string): RecentPlayed[]`**: 최근 플레이한 곡 HTML을 파싱하고 `RecentPlayed` 객체 배열을 반환합니다.
