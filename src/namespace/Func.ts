@@ -14,8 +14,35 @@ export namespace Func {
          * @returns 
          */
     export async function getSessionToken({ email, password }: { email: string, password: string }) {
+        // 브라우저의 실제 로그인 과정을 그대로 따라갑니다.
+        //   1. account-api 에 ID/PW 로그인 요청을 보냅니다. (응답에 세션 쿠키와 리다이렉트 URL 이 담깁니다)
+        //   2. 리다이렉트 URL 이 passkeyInfo.html 이라면 패스키 안내 화면을 건너뜁니다.
+        //      (실제 화면에서 "나중에" 를 누르는 것과 동일하게, /v3/passkey/info 를 호출한 뒤 redirect_uri 로 이동합니다)
+        //   3. 리다이렉트를 따라가다가 donderhiroba.jp 가 발급하는 _token_v2 쿠키를 세션 토큰으로 사용합니다.
+
+        // 로그인 과정에서 발급되는 쿠키를 모아 둡니다.
+        // (account-api 의 응답은 쿠키 헤더 대신 JSON 으로 쿠키 목록을 돌려줍니다)
+        const cookies: Record<string, { name: string, value?: string, domain?: string }> = {};
+        const addCookies = (cookieMap: Record<string, { name: string, value?: string, domain?: string }>) => {
+            for (const key of Object.keys(cookieMap ?? {})) {
+                const cookie = cookieMap[key];
+                if (cookie && cookie.name && cookie.value !== undefined) {
+                    cookies[cookie.name] = cookie;
+                }
+            }
+        };
+        const cookieJson = () => {
+            const result: Record<string, string> = {};
+            for (const [name, cookie] of Object.entries(cookies)) {
+                if (cookie.value !== undefined) {
+                    result[name] = cookie.value;
+                }
+            }
+            return JSON.stringify(result);
+        };
+
         /*
-        첫 번째 요청
+        첫 번째 요청: 로그인
         200 응답
         */
         let response: Response;
@@ -61,61 +88,27 @@ export namespace Func {
         }
 
         /*
-        두 번째 요청
-        302 응답
+        두 번째 요청 이후: 리다이렉트 추적
         */
+        let body: any;
         try {
-            const data = await response.json();
-            if (!data.redirect) {
-                throw new HirobaError("INVALID_ID_PASSWORD");
-            }
-
-            let redirectUri = new URL(data.redirect);
-            if (redirectUri.pathname.includes('passkeyInfo.html')) {
-                redirectUri = new URL(redirectUri.searchParams.get('redirect_uri') as string);
-            }
-
-            let cookieString = '';
-            const cookies = setCookieParser(response.headers.getSetCookie())
-            for (const cookie of cookies) {
-                if (cookie.domain === '.bandainamcoid.com' && cookie.value !== undefined) {
-                    cookieString += cookie.name + '=' + cookie.value + ';';
+            body = await response.json();
+            // 응답에 포함된 쿠키 목록을 저장합니다.
+            addCookies(body.cookie);
+            for (const cookie of setCookieParser(response.headers.getSetCookie())) {
+                if (cookie.value !== undefined) {
+                    cookies[cookie.name] = { name: cookie.name, value: cookie.value, domain: cookie.domain };
                 }
             }
-            response = await fetch(data.redirect, {
-                headers: createHeader(cookieString),
-                redirect: 'manual'
-            });
-        }
-        catch (err) {
-            if (err instanceof Response) {
-                throw new HirobaError("CANNOT_CONNECT", err)
-            }
-            else if (err instanceof HirobaError) {
-                throw err
-            }
-            else {
-                throw new HirobaError('CANNOT_CONNECT');
-            }
-        }
-
-        /*
-        세 번째 요청
-        302
-        */
-        try {
-            response = await fetch(response.headers.get('location') as string, {
-                headers: createHeader(),
-                redirect: 'manual'
-            });
-
-            if (response.status !== 302) {
-                throw response;
+            if (!body.redirect) {
+                throw new HirobaError("INVALID_ID_PASSWORD");
             }
         }
         catch (err) {
-            console.log(err);
-            if (err instanceof Response) {
+            if (err instanceof HirobaError) {
+                throw err;
+            }
+            else if (err instanceof Response) {
                 throw new HirobaError('CANNOT_CONNECT', err);
             }
             else {
@@ -123,22 +116,127 @@ export namespace Func {
             }
         }
 
-        /*
-        네 번째 요청
-        200
-        */
-        try {
-            response = await fetch(response.headers.get('location') as string, {
-                headers: createHeader(response.headers.getSetCookie()[2].split(';')[0])
-            });
-            const token = setCookieParser(response.headers.getSetCookie()).find(e => e.name === '_token_v2')?.value as string;
-            if (!token) {
-                throw response;
+        // 브라우저와 동일하게 요청 헤더를 구성합니다.
+        const accountHeaders = (): Record<string, string> => ({
+            "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+            "accept-language": "ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7",
+            "sec-fetch-dest": "document",
+            "sec-fetch-mode": "navigate",
+            "sec-fetch-site": "same-site",
+            "upgrade-insecure-requests": "1",
+            "Referer": "https://account.bandainamcoid.com/",
+            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+        });
+
+        // 호스트별 쿠키 저장소입니다. 같은 이름의 쿠키가 여러 번 오면 마지막 값이 적용됩니다.
+        // (실제 브라우저의 쿠키 저장소와 동일하게 동작하도록, 마지막 Set-Cookie 가 이깁니다)
+        const hostCookies: Record<string, Record<string, string>> = {};
+        const applySetCookies = (res: Response) => {
+            const host = new URL(res.url).host;
+            hostCookies[host] ??= {};
+            for (const cookie of setCookieParser(res.headers.getSetCookie())) {
+                if (cookie.value !== undefined) {
+                    hostCookies[host][cookie.name] = cookie.value;
+                }
             }
-            return token;
+        };
+        const cookieHeaderFor = (host: string) => {
+            const store = hostCookies[host];
+            if (!store) return undefined;
+            const joined = Object.entries(store).map(([name, value]) => `${name}=${value}`).join('; ');
+            return joined.length > 0 ? joined : undefined;
+        };
+
+        try {
+            let currentUrl = body.redirect as string;
+            let token: string | undefined;
+            // 리다이렉트를 따라가며 _token_v2 를 찾을 때까지 반복합니다.
+            for (let i = 0; i < 10; i++) {
+                const url = new URL(currentUrl);
+
+                // 패스키 안내 페이지(account.bandainamcoid.com/passkeyInfo.html)로 이동된 경우
+                if (url.pathname.includes('passkeyInfo.html')) {
+                    // 1. 실제 브라우저처럼 패스키 안내 페이지를 엽니다.
+                    await fetch(url, {
+                        headers: accountHeaders(),
+                        redirect: 'manual'
+                    });
+
+                    // 2. 페이지에 포함된 스크립트가 호출하는 것과 동일하게 passkey/info 를 호출합니다.
+                    //    (이 호출을 해야 뒤의 oauth2/auth 로 code 가 유효하게 전달됩니다)
+                    const code = url.searchParams.get('code') ?? '';
+                    const infoParams = new URLSearchParams();
+                    infoParams.set('client_id', url.searchParams.get('client_id') ?? 'nbgi_taiko');
+                    infoParams.set('backto', url.searchParams.get('backto') ?? '');
+                    infoParams.set('redirect_uri', url.searchParams.get('redirect_uri') ?? '');
+                    infoParams.set('customize_id', url.searchParams.get('customize_id') ?? '');
+                    infoParams.set('code', code);
+                    infoParams.set('language', 'ko');
+                    infoParams.set('cookie', cookieJson());
+
+                    const infoResponse = await fetch(`https://account-api.bandainamcoid.com/v3/passkey/info?${infoParams}`, {
+                        headers: {
+                            "accept": "application/json, text/javascript, */*; q=0.01",
+                            "accept-language": "ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7",
+                            "Referer": "https://account.bandainamcoid.com/",
+                            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+                        }
+                    });
+                    if (infoResponse.status === 200) {
+                        const infoBody = await infoResponse.json().catch(() => null);
+                        if (infoBody?.cookie) {
+                            addCookies(infoBody.cookie);
+                        }
+                    }
+
+                    // 3. 패스키 안내 화면에서 "나중에" 를 누른 것과 동일하게 redirect_uri 로 이동합니다.
+                    const redirectUri = url.searchParams.get('redirect_uri');
+                    if (!redirectUri) {
+                        throw new HirobaError('CANNOT_CONNECT');
+                    }
+                    const skipUrl = new URL(redirectUri);
+                    skipUrl.searchParams.set('code', code);
+                    currentUrl = skipUrl.toString();
+                    continue;
+                }
+
+                // 일반적인 리다이렉트 요청
+                // donderhiroba.jp 로 이동할 때는 이전 응답에서 받은 쿠키(_token_v2 포함)를 함께 보냅니다.
+                const headers = accountHeaders();
+                const cookieHeader = cookieHeaderFor(url.host);
+                if (cookieHeader) {
+                    headers.cookie = cookieHeader;
+                }
+                response = await fetch(currentUrl, {
+                    headers,
+                    redirect: 'manual'
+                });
+
+                // 응답으로 받은 쿠키를 저장하고, _token_v2 가 있으면 세션 토큰 후보로 기록합니다.
+                applySetCookies(response);
+                const host = new URL(response.url).host;
+                const tokenCandidate = hostCookies[host]?.['_token_v2'];
+                if (tokenCandidate) {
+                    token = tokenCandidate;
+                }
+
+                const location = response.headers.get('location');
+                // 더 이상 이동할 곳이 없으면(최종 200 응답) 세션 토큰을 반환합니다.
+                if (!location) {
+                    if (token) {
+                        return token;
+                    }
+                    throw response;
+                }
+                currentUrl = new URL(location, response.url).toString();
+            }
+            throw new HirobaError('CANNOT_CONNECT');
         }
         catch (err) {
-            if (err instanceof Response) {
+            if (err instanceof HirobaError) {
+                throw err;
+            }
+            else if (err instanceof Response) {
                 throw new HirobaError('CANNOT_CONNECT', err);
             }
             else {
